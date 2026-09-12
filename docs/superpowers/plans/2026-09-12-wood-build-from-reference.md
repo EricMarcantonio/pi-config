@@ -2059,6 +2059,7 @@ def _entry_from_search(cls, payload, today):
 def resolve(spec, cache, transport=None, refresh=False, today=None):
     """Return {stock class: price entry}. Offline unless refresh and a transport."""
     today = today or date.today().isoformat()
+    cache.load()                 # a cache handed in cold reads its file first
     if spec.data.get("pricing", {}).get("store"):
         cache.data.setdefault("store", spec.data["pricing"]["store"])
     if spec.data.get("pricing", {}).get("province"):
@@ -2134,7 +2135,7 @@ import shutil
 import tempfile
 import unittest
 
-from woodbuild.bom import BomLine, build_bom, totals
+from woodbuild.bom import BomLine, build_bom, totals, unpriced
 from woodbuild.optimise import BoardPlan, Part, SheetPlan
 from woodbuild.pricing import PriceCache
 from woodbuild.report import cutlist_rows, render_html, write_report
@@ -2236,7 +2237,8 @@ class TestReport(unittest.TestCase):
         lines = self.lines + [BomLine("vents", "louvre_12x18", "12x18 louvre", 2, "each")]
         html = render_html(self.spec, self.parts, self.sheets, self.boards, lines,
                           self.cache, today="2026-09-12")
-        self.assertIn("excludes 1 unpriced", html)
+        # the consumables in self.lines are unpriced too, so count them honestly
+        self.assertIn("excludes %d unpriced" % len(unpriced(lines)), html)
 
 
 if __name__ == "__main__":
@@ -2489,8 +2491,12 @@ import shutil
 import tempfile
 import unittest
 
-from woodbuild_spec_fixture import SPEC   # helper module created in the same step
 from woodbuild import cli_main
+
+try:                                    # `python3 -m unittest tests.test_cli`
+    from tests.woodbuild_spec_fixture import SPEC
+except ImportError:                     # discovered with tests/ itself on the path
+    from woodbuild_spec_fixture import SPEC  # type: ignore
 
 
 class TestCLI(unittest.TestCase):
@@ -2599,7 +2605,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from woodbuild import bom, frame, optimise, pricing, report  # noqa: E402
+from woodbuild import bom, frame, optimise, pricing, report, stock  # noqa: E402
 from woodbuild.optimise import NestError  # noqa: E402
 from woodbuild.spec import BuildSpec, SpecError  # noqa: E402
 
@@ -2640,9 +2646,12 @@ def cli_main(argv=None):
     cache.save()
 
     parts = frame.derive(spec)
+    # the two optimisers each reject foreign stock classes, so partition first
+    sheet_parts = [p for p in parts if stock.is_sheet(p.stock)]
+    board_parts = [p for p in parts if not stock.is_sheet(p.stock)]
     try:
-        sheet_plans, unplaced_sheets = optimise.pack_sheets(parts)
-        board_plans, unplaced_boards = optimise.cut_boards(parts, prices=prices)
+        sheet_plans, unplaced_sheets = optimise.pack_sheets(sheet_parts)
+        board_plans, unplaced_boards = optimise.cut_boards(board_parts, prices=prices)
     except NestError as exc:
         print("nesting error: %s" % exc, file=sys.stderr)
         return 3

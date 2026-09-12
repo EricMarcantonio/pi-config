@@ -1234,12 +1234,12 @@ class TestFrame(unittest.TestCase):
         self.assertEqual(front.qty, 7)                     # 8 stud positions -> 7 bays
 
     def test_blocking_fits_the_actual_bay(self):
-        # studs sit at span/n, so the clear bay is the step minus a stud's thickness
+        # studs sit at span / bays, so the clear bay is that pitch minus a stud
         parts = derive(spec())
         front = [p for p in parts if p.id == "blocking_front"][0]
-        self.assertAlmostEqual(front.w, 2788.92 / 8 - 38.0, places=1)    # 310.6 mm
+        self.assertAlmostEqual(front.w, 2788.92 / 7 - 38.0, places=1)    # 360.4 mm
         left = [p for p in parts if p.id == "blocking_left"][0]
-        self.assertAlmostEqual(left.w, 2179.32 / 7 - 38.0, places=1)     # 273.3 mm
+        self.assertAlmostEqual(left.w, 2179.32 / 6 - 38.0, places=1)     # 325.2 mm
 
     def test_glazing_is_panelised_too(self):
         # a pane wider than a 610 x 1220 polycarbonate sheet must be split
@@ -1369,10 +1369,12 @@ def _blocking(spec, wall, parts):
     positions = stud_positions(span, spacing)
     bays = max(0, len(positions) - 1)
     if bays:
-        # studs are laid out evenly at span/n, not at the nominal spacing, so the
-        # clear bay is step - stud thickness (the nominal spacing would over-length
-        # blocking by 8 mm on the long walls and 43 mm on the side walls)
-        step = span / len(positions)
+        # studs are laid out evenly, so the bay pitch is span / bays (equivalently
+        # span / n, NOT span / len(positions): stud_positions returns n + 1
+        # positions). The clear bay is that pitch minus one stud's thickness; using
+        # the nominal spacing instead over-lengths blocking by 8 mm on the long
+        # walls and 43 mm on the side walls.
+        step = span / bays
         parts.append(Part(id="blocking_%s" % wall,
                           w=round(step - stock.board_dims("2x4")[0], 2),
                           h=stock.board_dims("2x4")[1], qty=bays, stock="2x4",

@@ -60,6 +60,16 @@ class TestBom(unittest.TestCase):
         self.assertIn("3\"", kinds)
         self.assertTrue(all(c.unit_price is None for c in cons))
 
+    def test_consumables_take_prices_from_the_cache_by_class(self):
+        parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]
+        prices = {"screws_3in": {"price": 12.5, "sku": "555",
+                                 "source": "hd_search"}}
+        cons = consumables({"options": {}}, parts, prices=prices)
+        screws = [c for c in cons if c.stock == "screws_3in"][0]
+        self.assertEqual(screws.unit_price, 12.5)
+        self.assertEqual(screws.sku, "555")
+        self.assertEqual(screws.source, "hd_search")
+
     def test_totals_apply_hst(self):
         lines = [BomLine("lumber", "2x4", "2x4 SPF", 10, "each", 4.25),
                  BomLine("lumber", "2x6", "2x6 SPF", 2, "each", 9.98, sku=None)]

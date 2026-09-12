@@ -108,6 +108,14 @@ class TestReport(unittest.TestCase):
                           self.cache, today="2026-09-12")
         # the consumables in self.lines are unpriced too, so count them honestly
         self.assertIn("excludes %d unpriced" % len(unpriced(lines)), html)
+    def test_description_matched_prices_are_flagged(self):
+        lines = [BomLine("lumber", "2x4", "2x4 SPF", 1, "each", 4.25,
+                         sku="1", source="hd_search"),
+                 BomLine("lumber", "2x6", "2x6 SPF", 1, "each", 9.98,
+                         sku="2", source="hd_product")]
+        html = render_html(self.spec, self.parts, self.sheets, self.boards, lines,
+                          self.cache, today="2026-09-12")
+        self.assertEqual(html.count("matched by description - verify SKU"), 1)
 
 
 if __name__ == "__main__":

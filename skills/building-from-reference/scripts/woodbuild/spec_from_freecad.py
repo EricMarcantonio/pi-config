@@ -19,27 +19,24 @@ FLOOR_BUILD_UP = 89.0 + 89.0 + 18.0       # skid + joist + deck
 STORE = "7011"
 PROVINCE = "ON"
 
-# KeterPent97.FCStd is saved without the fused WallsOpen helper, so the envelope
-# falls back to the union of the four cut wall panels and the four corner posts.
-# Prefer WallsOpen when the model provides it.
-WALL_FALLBACK = ("FrontWallCut", "BackWallCut", "SideWallCutL", "SideWallCutR",
-                 "PostFL", "PostFR", "PostBL", "PostBR")
-
-
 def _wall_bounds(doc):
-    """Outer bounds of the walls-with-openings, wherever the model stores them."""
+    """Bounds of the wall envelope: WallsOpen when present, else the panels+posts."""
+    import FreeCAD
     walls = doc.getObject("WallsOpen")
     if walls is not None:
-        bb = walls.Shape.BoundBox
-        return {"xmin": bb.XMin, "xmax": bb.XMax, "ymin": bb.YMin,
-                "ymax": bb.YMax, "zmax": bb.ZMax}
-    shapes = [doc.getObject(name) for name in WALL_FALLBACK]
-    boxes = [s.Shape.BoundBox for s in shapes if s is not None]
-    if not boxes:
-        raise SpecError("model is missing WallsOpen and every fallback wall panel")
-    return {"xmin": min(b.XMin for b in boxes), "xmax": max(b.XMax for b in boxes),
-            "ymin": min(b.YMin for b in boxes), "ymax": max(b.YMax for b in boxes),
-            "zmax": max(b.ZMax for b in boxes)}
+        return walls.Shape.BoundBox
+    xs, ys, zs = [], [], []
+    for o in doc.Objects:
+        name = o.Name
+        if not (name.endswith(("Cut", "CutL", "CutR")) or name.startswith("Post")):
+            continue
+        if not getattr(o, "Shape", None) or o.Shape.isNull():
+            continue
+        bb = o.Shape.BoundBox
+        xs += [bb.XMin, bb.XMax]; ys += [bb.YMin, bb.YMax]; zs += [bb.ZMin, bb.ZMax]
+    if not xs:
+        raise SpecError("model has neither WallsOpen nor wall panels")
+    return FreeCAD.BoundBox(min(xs), min(ys), min(zs), max(xs), max(ys), max(zs))
 
 
 def envelope_from_shape_bounds(xmin, xmax, ymin, ymax, zmax_wall,
@@ -53,6 +50,14 @@ def envelope_from_shape_bounds(xmin, xmax, ymin, ymax, zmax_wall,
     return {"width": round(xmax - xmin, 2), "depth": round(ymax - ymin, 2),
             "height_tall": round(zmax_wall + model_roof_t, 2),
             "roof_fall": float(roof_fall), "tall_side": "front"}
+
+
+def envelope_from_bounds_list(bounds, model_roof_t, roof_fall):
+    """Pure helper: [[xmin,xmax,ymin,ymax,zmax_wall], ...] -> envelope dict."""
+    xmin = min(b[0] for b in bounds); xmax = max(b[1] for b in bounds)
+    ymin = min(b[2] for b in bounds); ymax = max(b[3] for b in bounds)
+    zmax = max(b[4] for b in bounds)
+    return envelope_from_shape_bounds(xmin, xmax, ymin, ymax, zmax, model_roof_t, roof_fall)
 
 
 def band_opening(model_band, envelope_width, corner_width, height_tall,
@@ -127,7 +132,14 @@ def spec_skeleton(envelope):
             "osb_7_16": "7/16 OSB sheathing", "plywood_tg_18": "3/4 tongue and groove plywood",
             "plywood_ext_18": "3/4 exterior plywood", "smartside_grooved": "LP SmartSide panel siding grooved",
             "polycarbonate_6": "6mm polycarbonate sheet", "louvre_12x18": "12x18 aluminium gable vent",
-            "steel_roof": "corrugated steel roofing panel"}},
+            "steel_roof": "corrugated steel roofing panel",
+            "screws_3in": "3 inch exterior structural screws",
+            "nails_8d": "8d galvanised sheathing nails",
+            "adhesive": "construction adhesive",
+            "sealant": "exterior sealant caulk",
+            "hinges": "shed door hinges",
+            "hasp": "hasp and staple lock",
+            "gravel": "crushed gravel 3/4 inch"}},
         "options": {"kerf": 3.0, "retain_offcut_min": 300.0},
     }
 
@@ -174,8 +186,8 @@ def openings_from_doc(doc, envelope):
 def spec_from_doc(doc, wall_zmax=None):
     import FreeCAD  # noqa: F401
     bb = _wall_bounds(doc)
-    env = envelope_from_shape_bounds(bb["xmin"], bb["xmax"], bb["ymin"], bb["ymax"],
-                                     wall_zmax if wall_zmax is not None else bb["zmax"],
+    env = envelope_from_shape_bounds(bb.XMin, bb.XMax, bb.YMin, bb.YMax,
+                                     wall_zmax if wall_zmax is not None else bb.ZMax,
                                      MODEL_ROOF_T, 200.0)
     spec = spec_skeleton(env)
     spec["openings"] = openings_from_doc(doc, env)
@@ -185,8 +197,8 @@ def spec_from_doc(doc, wall_zmax=None):
 def check_envelope(spec, doc):
     """Fail loudly if the model no longer matches the spec."""
     bb = _wall_bounds(doc)
-    width = bb["xmax"] - bb["xmin"]
-    depth = bb["ymax"] - bb["ymin"]
+    width = bb.XMax - bb.XMin
+    depth = bb.YMax - bb.YMin
     env = spec["envelope"]
     if abs(width - env["width"]) > 1.0 or abs(depth - env["depth"]) > 1.0:
         raise SpecError("envelope mismatch: model is %.1f x %.1f mm, spec says %.1f x %.1f mm"

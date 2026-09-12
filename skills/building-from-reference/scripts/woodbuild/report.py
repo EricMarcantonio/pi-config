@@ -140,9 +140,12 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
                        "<th class=num>Qty</th><th class=num>Unit</th>"
                        "<th class=num>Line</th><th>Source</th></tr>")
         cls_attr = "" if line.unit_price is not None else " class=unpriced"
+        desc = e(line.description)
+        if line.source == "hd_search":
+            desc += " <span class=warn>matched by description - verify SKU</span>"
         out.append("<tr%s><td>%s</td><td>%s</td><td class=num>%g %s</td>"
                    "<td class=num>%s</td><td class=num>%s</td><td>%s</td></tr>"
-                   % (cls_attr, e(line.description), e(line.sku or "-"), line.qty,
+                   % (cls_attr, desc, e(line.sku or "-"), line.qty,
                       e(line.uom), _num(line.unit_price), _num(line.line_total()),
                       e(line.source or "-")))
     if current is not None:

@@ -135,6 +135,15 @@ class TestPricing(unittest.TestCase):
         with self.assertRaises(PriceError):
             resolve(spec, cache, transport=None)
 
+    def test_null_store_in_cache_is_replaced_by_the_spec(self):
+        # a cache written with store: null must adopt the spec's store, not keep null
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": None, "province": None, "items": {}}
+        spec = make_spec({"2x4": "2x4x8 SPF stud"})
+        resolve(spec, cache, transport=None, today="2026-09-12")
+        self.assertEqual(cache.data["store"], "7011")
+        self.assertEqual(cache.store, "7011")
+
     def test_tax_rate_lookup(self):
         from woodbuild.pricing import tax_rate_for
         self.assertEqual(tax_rate_for("ON"), 0.13)

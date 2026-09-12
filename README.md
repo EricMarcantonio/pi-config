@@ -36,16 +36,22 @@ export PI_CODING_AGENT_DIR=~/pi-config   # add to ~/.zshrc / ~/.bashrc
 Then install the packages listed in `settings.json`:
 
 ```bash
-pi install npm:@ollama/pi-web-search
 pi install npm:pi-caveman
 pi install npm:pi-mcp-extension
+pi install npm:@blazer2k/searxng-suite
 pi install git:github.com/obra/superpowers
 ```
+
+Web search/extract is provided by `@blazer2k/searxng-suite` (local SearXNG),
+not by an Ollama package. See the Notes below.
 
 ## Notes
 
 - **Ollama models**: `models.json` points at `http://127.0.0.1:11434/v1` with `apiKey: "ollama"`. Change `baseUrl` if your Ollama isn't local. All model ids use the `:cloud` suffix.
 - **Costs** are USD per 1M tokens, off-peak rates only (pi has no time-of-day pricing; Ollama peak, Mon–Fri 12–18 UTC, is ~2×).
 - **Context windows** come from `ollama show <model>`.
+- **Web tools**: `@blazer2k/searxng-suite` provides `web_search` and `web_extract`, backed by a local SearXNG instance. `SEARXNG_URL` is set to `http://localhost:8080` in `~/.zshrc` (Docker setup lives in `~/searxng`). Ollama is used only for reasoning; the former `@ollama/pi-web-search` package is intentionally not used.
+- **Vision / image input**: pi only forwards image attachments to models whose `models.json` entry lists `"input": ["text", "image"]`. Without it the model silently receives text only. Verified by an image probe (prompt tokens 31 → 340 when an image is attached): image-capable are `deepseek-v4.1-flash:cloud`, `glm-5.3-flash:cloud`, `kimi-k3:cloud`; `deepseek-v4-flash:cloud`, `deepseek-v4-pro:cloud` and `glm-5.3:cloud` reject images with HTTP 400. Regenerating `models.json` can drop the `input` field, so re-add it if attachments stop reaching the model.
+- **MCP servers**: `mcp.json` configures MCP servers for `npm:pi-mcp-extension` (global scope, applies to all projects). Currently one stdio server: `freecad` (`uvx freecad-mcp`), which bridges to a running FreeCAD instance over its RPC socket (default port 9875). Tools register as `mcp_freecad_*`; inspect with `/mcp`.
 - **No secrets** are stored here (`apiKey` is the literal `"ollama"`).
 - **Wordy footer**: `extensions/wordy-footer.ts` replaces pi's symbol footer (`↑ ↓ R W CH`) with words (`input`, `output`, `cache-read`, `cache-hit`, `cost`, `context`). Toggle at runtime with `/footer-words`; the choice is saved to `settings.json` as `"wordyFooter"`, so it syncs across machines. Delete the extension file to restore the default footer permanently.

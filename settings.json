@@ -1,14 +1,14 @@
 {
   "defaultModel": "deepseek-v4.1-flash:cloud",
   "defaultProvider": "ollama",
-  "hideThinkingBlock": true,
+  "hideThinkingBlock": false,
   "lastChangelogVersion": "0.85.1",
   "theme": "dark",
   "wordyFooter": true,
   "packages": [
-    "npm:@ollama/pi-web-search",
     "npm:pi-caveman",
     "git:github.com/obra/superpowers",
-    "npm:pi-mcp-extension"
+    "npm:pi-mcp-extension",
+    "npm:@blazer2k/searxng-suite"
   ]
 }

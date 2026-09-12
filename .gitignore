@@ -12,3 +12,6 @@ sessions/
 
 # os noise
 .DS_Store
+
+# local backups
+*.bak

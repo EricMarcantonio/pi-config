@@ -1,0 +1,16 @@
+{
+  "settings": {
+    "toolPrefix": "mcp",
+    "requestTimeoutMs": 60000,
+    "maxRetries": 5
+  },
+  "mcpServers": {
+    "freecad": {
+      "transport": "stdio",
+      "command": "uvx",
+      "args": ["freecad-mcp"],
+      "lifecycle": "eager",
+      "env": {}
+    }
+  }
+}

@@ -189,8 +189,18 @@ class BoardPlan:
         return 100.0 * self.used_mm / self.purchased_mm if self.purchased_mm else 0.0
 
     def offcuts(self):
-        rem = self.purchased_mm - self.used_mm - stock.KERF * (len(self.cuts) - 1 if self.cuts else 0)
-        return [round(rem, 1)] if rem >= stock.RETAIN_OFFCUT_MIN else []
+        """Remainders >= RETAIN_OFFCUT_MIN, board by board.
+
+        A board holding k parts is cut k-1 times, so the kerf is accounted per
+        board rather than pooled across the plan.
+        """
+        out = []
+        for row in self.cuts:
+            used = sum(x for _, x in row)
+            rem = self.length_mm - used - stock.KERF * max(0, len(row) - 1)
+            if rem >= stock.RETAIN_OFFCUT_MIN:
+                out.append(round(rem, 1))
+        return out
 
 
 def _ffd(lengths, stock_len, kerf):
@@ -238,7 +248,9 @@ def cut_boards(parts, prices=None, kerf=stock.KERF):
                 cost = len(boards) * prices[cls][stock_len]
             else:
                 cost = len(boards) * stock_len          # fall back to purchased length
-            waste = len(boards) * stock_len - sum(lengths) - kerf * (len(boards) - 1)
+            # kerfs actually cut: a board holding k parts is cut k-1 times
+            waste = (len(boards) * stock_len - sum(lengths)
+                     - kerf * (len(lengths) - len(boards)))
             candidates.append((cost, waste, stock_len, boards))
         if not candidates:
             unplaced.extend(group)

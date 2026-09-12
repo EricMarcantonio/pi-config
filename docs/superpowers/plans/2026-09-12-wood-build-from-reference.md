@@ -642,6 +642,16 @@ class TestSheetNesting(unittest.TestCase):
         self.assertTrue(plans[0].sheets[0][0].rotated)
         self.assertAlmostEqual(plans[0].sheets[0][0].w, 220.0)
 
+    def test_sheet_offcuts_keep_large_remainders(self):
+        # one 600 x 600 panel leaves a 1838 mm tall strip above it on a 1219 x 2438 sheet
+        plans, _ = pack_sheets([P("s", 600.0, 600.0)])
+        offcuts = plans[0].offcuts()
+        self.assertTrue(any(h >= 300.0 for _, h in offcuts))
+
+    def test_non_sheet_stock_is_rejected(self):
+        with self.assertRaises(NestError):
+            pack_sheets([P("b", 1000.0, 89.0, cls="2x4")])
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -919,6 +929,26 @@ class TestBoardCutting(unittest.TestCase):
         self.assertEqual(plans[0].length_mm, 4876.8)
         self.assertEqual(plans[0].count, 1)
 
+    def test_partial_length_table_excludes_the_unpriced_length(self):
+        # prices cover 8 and 12 ft but not 10 or 16 ft. Ranking the unpriced 16 ft
+        # board by millimetres against dollars would silently exclude it; 12 ft wins.
+        prices = {"2x4": {2438.4: 1.0, 3657.6: 5.0}}
+        plans, unplaced = cut_boards([B("s", 3000.0, qty=2)], prices=prices)
+        self.assertEqual(unplaced, [])
+        self.assertEqual(plans[0].length_mm, 3657.6)
+        self.assertEqual(plans[0].count, 2)
+
+    def test_flat_per_class_price_applies_to_every_length(self):
+        # the real price cache holds one price per class, not a length table
+        plans, _ = cut_boards([B("s", 2400.0, qty=2)],
+                              prices={"2x4": {"price": 9.99, "sku": "1"}})
+        self.assertEqual(plans[0].length_mm, 4876.8)      # fewest boards wins the tie
+
+    def test_board_offcuts_keep_large_remainders(self):
+        plans, _ = cut_boards([B("s", 1000.0)])
+        self.assertEqual(plans[0].length_mm, 2438.4)
+        self.assertEqual(plans[0].offcuts(), [1438.4])
+
 
 if __name__ == "__main__":
     unittest.main()
@@ -967,6 +997,28 @@ class BoardPlan:
         return out
 
 
+def _price_for_length(prices, cls, length_mm):
+    """(price, is_length_table) for one sale length.
+
+    `prices[cls]` is either a flat per-board price entry (`{"price": 4.25, ...}`,
+    which is what the real price cache holds) or a length -> price table (tests).
+    A length table that omits a length means that length is not priced: the
+    caller skips the candidate rather than ranking millimetres against dollars.
+    """
+    entry = (prices or {}).get(cls)
+    if isinstance(entry, dict):
+        if length_mm in entry:
+            return float(entry[length_mm]), True
+        if "price" in entry:
+            value = entry["price"]
+            return (float(value) if value is not None else None), False
+        numeric = [v for k, v in entry.items() if isinstance(k, (int, float))]
+        return None, bool(numeric)
+    if isinstance(entry, (int, float)):
+        return float(entry), False
+    return None, False
+
+
 def _ffd(lengths, stock_len, kerf):
     """First-fit-decreasing into boards of stock_len. Returns list of boards."""
     boards = []
@@ -1008,10 +1060,13 @@ def cut_boards(parts, prices=None, kerf=stock.KERF):
             boards = _ffd(lengths, stock_len, kerf)
             if boards is None:
                 continue
-            if prices and cls in prices and stock_len in prices[cls]:
-                cost = len(boards) * prices[cls][stock_len]
+            price, length_table = _price_for_length(prices, cls, stock_len)
+            if length_table and price is None:
+                continue                                  # unpriced length in a partial table
+            if price is not None:
+                cost = len(boards) * price
             else:
-                cost = len(boards) * stock_len          # fall back to purchased length
+                cost = len(boards) * stock_len            # no prices: rank by purchased length
             # kerfs actually cut: a board holding k parts is cut k-1 times
             waste = (len(boards) * stock_len - sum(lengths)
                      - kerf * (len(lengths) - len(boards)))

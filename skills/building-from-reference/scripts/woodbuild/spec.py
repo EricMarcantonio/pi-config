@@ -104,6 +104,11 @@ class BuildSpec:
         problems = []
         self._check_stock_classes(problems)
 
+        known_walls = ("front", "back", "left", "right")
+        for o in self.openings():
+            if o["wall"] not in known_walls:
+                problems.append("opening on unknown wall: %s" % o["wall"])
+
         env = self.envelope
         try:
             build_up = self.wall_build_up()

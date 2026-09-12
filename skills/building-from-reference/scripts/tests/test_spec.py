@@ -109,6 +109,13 @@ class TestSpec(unittest.TestCase):
             BuildSpec.load(write(data)).validate()
         self.assertIn("datum", str(ctx.exception))
 
+    def test_opening_on_an_unknown_wall_is_rejected(self):
+        data = json.loads(json.dumps(GOOD))
+        data["openings"][0]["wall"] = "fron"          # typo: silently dropped before
+        with self.assertRaises(SpecError) as ctx:
+            BuildSpec.load(write(data)).validate()
+        self.assertIn("unknown wall", str(ctx.exception))
+
     def test_search_terms_pass_through(self):
         spec = BuildSpec.load(self.path)
         self.assertEqual(spec.search_terms()["2x4"], "2x4x8 SPF stud")

@@ -113,6 +113,14 @@ class TestFrame(unittest.TestCase):
         front = [p for p in blocking if p.id == "blocking_front"][0]
         self.assertEqual(front.qty, 7)                     # 8 stud positions -> 7 bays
 
+    def test_blocking_fits_the_actual_bay(self):
+        # studs sit at span / bays, so the clear bay is that pitch minus a stud
+        parts = derive(spec())
+        front = [p for p in parts if p.id == "blocking_front"][0]
+        self.assertAlmostEqual(front.w, 2788.92 / 7 - 38.0, places=1)    # 360.4 mm
+        left = [p for p in parts if p.id == "blocking_left"][0]
+        self.assertAlmostEqual(left.w, 2179.32 / 6 - 38.0, places=1)     # 325.2 mm
+
     def test_glazing_is_panelised_too(self):
         # a pane wider than a 610 x 1220 polycarbonate sheet must be split
         s = spec()

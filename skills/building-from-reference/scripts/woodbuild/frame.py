@@ -106,8 +106,14 @@ def _blocking(spec, wall, parts):
     spacing = float(spec.data["wall"].get("spacing", STUD_SPACING_DEFAULT))
     bays = max(0, len(stud_positions(span, spacing)) - 1)
     if bays:
+        # studs are laid out evenly, so the bay pitch is span / bays (equivalently
+        # span / n, NOT span / len(positions): stud_positions returns n + 1
+        # positions). The clear bay is that pitch minus one stud's thickness; using
+        # the nominal spacing instead over-lengths blocking by 8 mm on the long
+        # walls and 43 mm on the side walls.
+        step = span / bays
         parts.append(Part(id="blocking_%s" % wall,
-                          w=round(spacing - stock.board_dims("2x4")[0], 2),
+                          w=round(step - stock.board_dims("2x4")[0], 2),
                           h=stock.board_dims("2x4")[1], qty=bays, stock="2x4",
                           assembly="wall_%s" % wall,
                           note="blocking at the roof bearing line"))

@@ -1805,7 +1805,8 @@ import os
 import tempfile
 import unittest
 
-from woodbuild.pricing import PriceCache, compare, resolve
+from woodbuild.pricing import (PriceCache, PriceError, PricingTransportError,
+                               StdioMCP, compare, resolve)
 from woodbuild.spec import BuildSpec
 
 
@@ -1904,10 +1905,82 @@ class TestPricing(unittest.TestCase):
         deltas = compare(old, new)
         self.assertEqual(deltas, [("2x4", 4.19, 4.49, 0.30)])
 
+    def test_refresh_only_touches_missing_or_stale_classes(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "7011", "province": "ON", "items": {
+            "2x4": {"sku": "1", "price": 4.19, "fetched": "2026-09-11"},      # fresh
+            "2x6": {"sku": "2", "price": 9.99, "fetched": "2026-01-01"}}}    # stale
+        spec = make_spec({"2x4": "2x4x8 SPF stud", "2x6": "2x6x8 SPF"})
+        transport = FakeTransport({"2x4x8 SPF stud": SEARCH_HIT,
+                                   "2x6x8 SPF": SEARCH_HIT})
+        resolve(spec, cache, transport=transport, refresh=True, today="2026-09-12")
+        self.assertEqual([c[1]["query"] for c in transport.calls], ["2x6x8 SPF"])
+
+    def test_transport_error_marks_unpriced_with_its_own_reason(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "7011", "province": "ON", "items": {}}
+        spec = make_spec({"2x4": "2x4x8 SPF stud"})
+
+        class Exploding:
+            def call(self, tool, arguments):
+                raise PricingTransportError("server died")
+
+        prices = resolve(spec, cache, transport=Exploding(), refresh=True,
+                         today="2026-09-12")
+        self.assertNotIn("2x4", prices)
+        self.assertIn("server died", cache.data["unpriced"]["2x4"]["reason"])
+
+    def test_cache_for_another_store_is_a_hard_error(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "7001", "province": "ON", "items": {}}
+        spec = make_spec({"2x4": "2x4x8 SPF stud"})
+        with self.assertRaises(PriceError):
+            resolve(spec, cache, transport=None)
+
     def test_tax_rate_lookup(self):
         from woodbuild.pricing import tax_rate_for
         self.assertEqual(tax_rate_for("ON"), 0.13)
         self.assertEqual(tax_rate_for("AB"), 0.05)
+
+
+class TestStdioMCP(unittest.TestCase):
+    """Drives a real stub server over stdio: the transport is not mocked."""
+
+    STUB = '''
+import json, sys
+
+def send(obj):
+    sys.stdout.write(json.dumps(obj) + "\\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg.get("method") == "initialize":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"serverInfo": {"name": "stub"}}})
+    elif msg.get("method") == "tools/call":
+        # noise first: a notification must not be mistaken for the reply
+        send({"jsonrpc": "2.0", "method": "notifications/message", "params": {}})
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"content": [
+            {"type": "text", "text": json.dumps({
+                "products": [{"sku": "1000123456", "name": "2x4x8 SPF Stud",
+                              "price": 2.5, "inStockOnline": True}]})}]}})
+'''
+
+    def test_handshake_and_id_matched_call(self):
+        import os
+        import sys
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix="-stub-mcp.py")
+        with os.fdopen(fd, "w") as fh:
+            fh.write(self.STUB)
+        client = StdioMCP(sys.executable, [path])
+        try:
+            payload = client.call("hd_search", {"query": "2x4x8 SPF stud"})
+        finally:
+            client.close()
+            os.unlink(path)
+        self.assertEqual(payload["products"][0]["sku"], "1000123456")
+        self.assertEqual(payload["products"][0]["price"], 2.5)
 
 
 if __name__ == "__main__":
@@ -1925,13 +1998,23 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'woodbuild.pricing'`
 # woodbuild/pricing.py
 """Cache-first pricing. Never invents a number: a missing price is reported."""
 
+import collections
 import json
 import os
 import subprocess
+import threading
 from datetime import date
 
 TAX_RATES = {"ON": 0.13, "AB": 0.05, "BC": 0.12, "QC": 0.14975,
              "MB": 0.12, "SK": 0.11, "NS": 0.15, "NB": 0.15, "NL": 0.15, "PE": 0.15}
+
+
+class PriceError(Exception):
+    """The cache and the spec disagree about which store the prices belong to."""
+
+
+class PricingTransportError(Exception):
+    """The MCP server could not answer a price lookup."""
 
 
 def tax_rate_for(province):
@@ -1991,7 +2074,14 @@ class PriceCache:
 
 
 class StdioMCP:
-    """Minimal MCP stdio client: enough for tools/call on the Home Depot server."""
+    """Minimal MCP stdio client: enough for tools/call on the Home Depot server.
+
+    Responses are matched by id, because a server notification arriving between
+    request and reply is not the reply. stderr is drained on a thread so a chatty
+    server cannot fill the pipe and deadlock. Protocol errors raise instead of
+    looking like an empty result, which would otherwise be reported as an unpriced
+    line with a misleading reason.
+    """
 
     def __init__(self, command, args, env=None):
         self.proc = subprocess.Popen([command] + list(args), stdin=subprocess.PIPE,
@@ -1999,13 +2089,23 @@ class StdioMCP:
                                      text=True, bufsize=1,
                                      env=env or os.environ.copy())
         self._id = 0
+        self.stderr_lines = collections.deque(maxlen=20)
+        self._drain = threading.Thread(target=self._drain_stderr, daemon=True)
+        self._drain.start()
         self._send({
             "jsonrpc": "2.0", "id": self._next(), "method": "initialize",
             "params": {"protocolVersion": "2025-03-26", "capabilities": {},
                        "clientInfo": {"name": "woodbuild", "version": "0.1.0"}}})
-        self._read()
+        self._read(self._id)
         self._send({"jsonrpc": "2.0", "method": "notifications/initialized",
                     "params": {}})
+
+    def _drain_stderr(self):
+        try:
+            for line in self.proc.stderr:
+                self.stderr_lines.append(line.rstrip())
+        except Exception:
+            pass
 
     def _next(self):
         self._id += 1
@@ -2015,34 +2115,58 @@ class StdioMCP:
         self.proc.stdin.write(json.dumps(obj) + "\n")
         self.proc.stdin.flush()
 
-    def _read(self):
+    def _read(self, want_id=None):
+        """Next message, ignoring anything that is not the reply we are waiting for."""
         while True:
             line = self.proc.stdout.readline()
             if not line:
                 return None
             try:
-                return json.loads(line)
+                msg = json.loads(line)
             except ValueError:
                 continue
+            if want_id is not None and msg.get("id") != want_id:
+                continue
+            return msg
 
     def call(self, tool, arguments):
-        self._send({"jsonrpc": "2.0", "id": self._next(), "method": "tools/call",
+        rid = self._next()
+        self._send({"jsonrpc": "2.0", "id": rid, "method": "tools/call",
                     "params": {"name": tool, "arguments": arguments}})
-        reply = self._read() or {}
+        reply = self._read(rid)
+        if reply is None:
+            raise PricingTransportError("%s got no reply; stderr: %s"
+                                        % (tool, " | ".join(self.stderr_lines)))
+        if reply.get("error"):
+            raise PricingTransportError("%s failed: %s" % (tool, reply["error"]))
         content = (reply.get("result") or {}).get("content") or []
         for block in content:
             if block.get("type") == "text":
                 try:
-                    return json.loads(block["text"])
+                    payload = json.loads(block["text"])
                 except ValueError:
                     return {"text": block["text"]}
+                if isinstance(payload, dict):
+                    return payload
+                if isinstance(payload, list):
+                    return {"products": payload}
+                return {"value": payload}
         return {}
 
     def close(self):
         try:
             self.proc.terminate()
+            self.proc.wait(timeout=5)
         except Exception:
-            pass
+            try:
+                self.proc.kill()
+            except Exception:
+                pass
+        for stream in (self.proc.stdin, self.proc.stdout, self.proc.stderr):
+            try:
+                stream.close()
+            except Exception:
+                pass
 
 
 def _entry_from_search(cls, payload, today):
@@ -2057,26 +2181,40 @@ def _entry_from_search(cls, payload, today):
 
 
 def resolve(spec, cache, transport=None, refresh=False, today=None):
-    """Return {stock class: price entry}. Offline unless refresh and a transport."""
+    """Return {stock class: price entry}. Offline unless refresh and a transport.
+
+    Refresh touches only missing or stale classes. A cache priced for a different
+    store than the spec is a hard error: silently pricing the wrong store is a
+    money-correctness hazard.
+    """
     today = today or date.today().isoformat()
     cache.load()                 # a cache handed in cold reads its file first
+    want_store = spec.data.get("pricing", {}).get("store")
+    want_prov = spec.data.get("pricing", {}).get("province")
+    if cache.store and want_store and str(cache.store) != str(want_store):
+        raise PriceError("price cache is for store %s but the spec says store %s; "
+                         "re-point the spec or delete the cache" % (cache.store, want_store))
+    if cache.province and want_prov and cache.province != want_prov:
+        raise PriceError("price cache is %s but the spec says %s"
+                         % (cache.province, want_prov))
     if spec.data.get("pricing", {}).get("store"):
         cache.data.setdefault("store", spec.data["pricing"]["store"])
     if spec.data.get("pricing", {}).get("province"):
         cache.data.setdefault("province", spec.data["pricing"]["province"])
     terms = spec.search_terms()
-    if not terms and spec.data.get("pricing", {}).get("store"):
-        # sensible defaults when the spec lists no search terms
-        terms = {}
     for cls, query in terms.items():
         entry = cache.get(cls)
-        if entry and not refresh and not cache.is_stale(cls, days=7, today=today):
-            continue
+        if entry and not cache.is_stale(cls, days=7, today=today):
+            continue                              # fresh: refresh only touches stale classes
         if transport is None:
             continue
-        payload = transport.call("hd_search", {"query": query,
-                                               "storeId": cache.store or "9999",
-                                               "pageSize": 5})
+        try:
+            payload = transport.call("hd_search", {"query": query,
+                                                    "storeId": cache.store or "9999",
+                                                    "pageSize": 5})
+        except PricingTransportError as exc:
+            cache.mark_unpriced(cls, "transport error: %s" % exc, ["hd_search"])
+            continue
         found = _entry_from_search(cls, payload or {}, today)
         if found:
             cache.put(cls, found)
@@ -2104,7 +2242,7 @@ def compare(old, new):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd ~/.pi/agent/skills/building-from-reference/scripts && python3 -m unittest tests.test_pricing -v`
-Expected: PASS (7 tests).
+Expected: PASS (11 tests). The stdio test drives a real stub server, so it proves the id-matched read against notification noise.
 
 - [ ] **Step 5: Commit**
 
@@ -2640,6 +2778,9 @@ def cli_main(argv=None):
     try:
         prices = pricing.resolve(spec, cache, transport=transport, refresh=args.fetch,
                                  today=args.today)
+    except pricing.PriceError as exc:
+        print("pricing error: %s" % exc, file=sys.stderr)
+        return 2
     finally:
         if transport:
             transport.close()

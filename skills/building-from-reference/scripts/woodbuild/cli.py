@@ -73,6 +73,9 @@ def cli_main(argv=None):
     print("subtotal $%.2f + tax $%.2f = $%.2f (%d lines, %d unpriced, tax rate %.3f)" %
           (t["subtotal"], t["tax"], t["total"], t["lines"], t["unpriced"],
            pricing.tax_rate_for(cache.province or "ON")))
+    matched = sum(1 for l in lines if l.source == "hd_search")
+    if matched:
+        print("description-matched lines: %d (verify SKUs before ordering)" % matched)
     for key in ("html", "cutlist", "cart", "sku_qty"):
         print("  %s" % paths[key])
 

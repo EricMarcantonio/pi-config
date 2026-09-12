@@ -55,12 +55,12 @@ def build_bom(parts, sheet_plans, board_plans, prices=None, spec=None):
             source=(entry or {}).get("source"),
             note="yield %.1f%%" % plan.yield_pct()))
     if spec is not None:                     # a parts-only BOM omits the consumables
-        lines.extend(consumables(spec, parts))
+        lines.extend(consumables(spec, parts, prices=prices))
     lines.sort(key=lambda l: (l.category, l.stock, l.description))
     return lines
 
 
-def consumables(spec, parts):
+def consumables(spec, parts, prices=None):
     """Fasteners, adhesive and sealant derived from geometry, never guessed."""
     total_end_mm = 0.0
     sheathing_perimeter_mm = 0.0
@@ -94,6 +94,12 @@ def consumables(spec, parts):
         BomLine("base", "gravel", "compacted gravel / pavers for the pad",
                 1, "load", None, None, None, "the reference needs level ground only"),
     ]
+    for line in out:            # a consumable may have a cache entry by its class
+        entry = _price_for(prices, line.stock)
+        if entry:
+            line.unit_price = entry.get("price")
+            line.sku = entry.get("sku")
+            line.source = entry.get("source")
     return out
 
 

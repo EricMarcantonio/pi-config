@@ -200,10 +200,10 @@ def resolve(spec, cache, transport=None, refresh=False, today=None):
     if cache.province and want_prov and cache.province != want_prov:
         raise PriceError("price cache is %s but the spec says %s"
                          % (cache.province, want_prov))
-    if spec.data.get("pricing", {}).get("store"):
-        cache.data.setdefault("store", spec.data["pricing"]["store"])
-    if spec.data.get("pricing", {}).get("province"):
-        cache.data.setdefault("province", spec.data["pricing"]["province"])
+    if want_store and not cache.data.get("store"):
+        cache.data["store"] = want_store
+    if want_prov and not cache.data.get("province"):
+        cache.data["province"] = want_prov
     terms = spec.search_terms()
     for cls, query in terms.items():
         entry = cache.get(cls)

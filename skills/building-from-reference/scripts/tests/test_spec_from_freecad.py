@@ -1,8 +1,8 @@
 # tests/test_spec_from_freecad.py
 import unittest
 
-from woodbuild.spec_from_freecad import (band_opening, envelope_from_shape_bounds,
-                                         spec_skeleton)
+from woodbuild.spec_from_freecad import (band_opening, envelope_from_bounds_list,
+                                         envelope_from_shape_bounds, spec_skeleton)
 
 
 class TestExtraction(unittest.TestCase):
@@ -19,6 +19,16 @@ class TestExtraction(unittest.TestCase):
         self.assertAlmostEqual(env["depth"], 2179.32)
         self.assertAlmostEqual(env["height_tall"], 2258.06)
         self.assertEqual(env["roof_fall"], 200.0)
+
+    def test_envelope_from_bounds_list_unions_panels(self):
+        # no FreeCAD needed: the wall fallback is two cut panels whose union is
+        # the product envelope (2788.92 x 2179.32 x 2258.06 mm)
+        bounds = [[0.0, 2788.92, 0.0, 2179.32, 2178.06],
+                  [0.0, 2788.92, 0.0, 2179.32, 2100.0]]
+        env = envelope_from_bounds_list(bounds, model_roof_t=80.0, roof_fall=200.0)
+        self.assertAlmostEqual(env["width"], 2788.92)
+        self.assertAlmostEqual(env["depth"], 2179.32)
+        self.assertAlmostEqual(env["height_tall"], 2258.06)
 
     def test_band_sill_is_recomputed_for_the_wood_roof(self):
         # wood roof build-up 120 mm vs the model's 80 mm lowers the band by 40 mm,

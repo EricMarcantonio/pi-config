@@ -182,6 +182,14 @@ Consumables are **derived**: fasteners per connection type counted from the part
 
 Cache-first so budgets are reproducible and price drift is reviewable in git.
 
+**Matching an item to a product is an agent judgment, not a script.** A programmatic description search almost always fails once the catalogue has more than a handful of similar products — the first real run proved it (the `2x4` class matched a $60.48 anchor bolt and accounted for ~$2,540 of the subtotal; `steel_roof` matched a ceiling tile; `hasp` matched a child-safety magnet). And any SKU written into a spec rots: Home Depot drops and replaces products of the same type constantly. So:
+
+- the agent searches, **reads the candidate products**, and picks the one that is actually the material the cutlist calls for;
+- the chosen SKU, its product name, its URL, its price and the reason it was chosen are recorded in the cache — the durable record is the *decision and its provenance*, not the SKU alone;
+- a script may only ever price a line the agent has already matched. An unmatched line stays `unpriced` with its reason. A search hit is a *candidate for the agent to judge*, never a price;
+- the cache carries a match date, so a later run can be told a match is stale and re-match it (re-matching is cheap; a wrong SKU bought is not);
+- the workbook marks every line's provenance — agent-matched, or unmatched/unpriced — so an unattended run can never look like a finished budget.
+
 ```jsonc
 { "store": "7011", "storeName": "ETOBICOKE SOUTH", "province": "ON", "currency": "CAD",
   "fetched": "2026-09-12T18:20:00Z",
@@ -193,8 +201,8 @@ Cache-first so budgets are reproducible and price drift is reviewable in git.
 ```
 
 - default run is **offline** from cache.
-- `--fetch` refreshes only missing or older-than-7-days SKUs over MCP stdio, `hd_product` first, `hd_search` by description as fallback (matching is recorded, because description matching can pick the wrong SKU).
-- **no invented prices.** A SKU with no price renders as `unpriced` with its reason and the tools already tried; the grand total carries an "excludes N unpriced lines" caveat.
+- `--fetch` refreshes only missing or older-than-7-days classes over MCP stdio. It uses `hd_product` when the agent has already matched a SKU, and `hd_search` only to *gather candidates* for the agent to judge — a search result is never written to the cache as a price by a script.
+- **No invented prices, and no auto-accepted ones.** A price comes from an agent-matched SKU, or the class is `unpriced` with its reason; the workbook carries an "excludes N unpriced lines" caveat and its provenance column. A description-matched line is explicitly labelled a candidate, not a cost.
 - `--compare old-prices.json` prints a price-delta table.
 - live behaviour verified during brainstorming: `hd_search` on store 7011 returned real SKUs with CAD prices and stock, and some SKUs returned `"price": null`, confirming the need for the `unpriced` path.
 

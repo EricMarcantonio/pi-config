@@ -68,6 +68,16 @@ class TestSheetNesting(unittest.TestCase):
         self.assertAlmostEqual(plans[0].yield_pct(), 98.4, places=1)
         self.assertAlmostEqual(parts_area([P("a", 100.0, 200.0, qty=3)]), 60000.0)
 
+    def test_sheet_offcuts_keep_large_remainders(self):
+        # one 600 x 600 panel leaves a 1838 mm tall strip above it on a 1219 x 2438 sheet
+        plans, _ = pack_sheets([P("s", 600.0, 600.0)])
+        offcuts = plans[0].offcuts()
+        self.assertTrue(any(h >= 300.0 for _, h in offcuts))
+
+    def test_non_sheet_stock_is_rejected(self):
+        with self.assertRaises(NestError):
+            pack_sheets([P("b", 1000.0, 89.0, cls="2x4")])
+
     def test_glazing_uses_its_own_sheet_class(self):
         # a 700 x 220 pane must turn to fit a 610 x 1220 sheet
         plans, unplaced = pack_sheets([P("pane", 700.0, 220.0, cls="polycarbonate_6")])

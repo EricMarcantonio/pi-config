@@ -62,6 +62,26 @@ class TestBoardCutting(unittest.TestCase):
         self.assertEqual(plans[0].length_mm, 4876.8)
         self.assertEqual(plans[0].count, 1)
 
+    def test_partial_length_table_excludes_the_unpriced_length(self):
+        # prices cover 8 and 12 ft but not 10 or 16 ft. Ranking the unpriced 16 ft
+        # board by millimetres against dollars would silently exclude it; 12 ft wins.
+        prices = {"2x4": {2438.4: 1.0, 3657.6: 5.0}}
+        plans, unplaced = cut_boards([B("s", 3000.0, qty=2)], prices=prices)
+        self.assertEqual(unplaced, [])
+        self.assertEqual(plans[0].length_mm, 3657.6)
+        self.assertEqual(plans[0].count, 2)
+
+    def test_flat_per_class_price_applies_to_every_length(self):
+        # the real price cache holds one price per class, not a length table
+        plans, _ = cut_boards([B("s", 2400.0, qty=2)],
+                              prices={"2x4": {"price": 9.99, "sku": "1"}})
+        self.assertEqual(plans[0].length_mm, 4876.8)      # fewest boards wins the tie
+
+    def test_board_offcuts_keep_large_remainders(self):
+        plans, _ = cut_boards([B("s", 1000.0)])
+        self.assertEqual(plans[0].length_mm, 2438.4)
+        self.assertEqual(plans[0].offcuts(), [1438.4])
+
 
 if __name__ == "__main__":
     unittest.main()

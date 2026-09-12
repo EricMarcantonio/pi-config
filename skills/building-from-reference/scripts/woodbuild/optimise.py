@@ -219,6 +219,28 @@ def _ffd(lengths, stock_len, kerf):
     return boards
 
 
+def _price_for_length(prices, cls, length_mm):
+    """(price, is_length_table) for one sale length.
+
+    `prices[cls]` is either a flat per-board price entry (`{"price": 4.25, ...}`,
+    which is what the real price cache holds) or a length -> price table (tests).
+    A length table that omits a length means that length is not priced: the
+    caller skips the candidate rather than ranking millimetres against dollars.
+    """
+    entry = (prices or {}).get(cls)
+    if isinstance(entry, dict):
+        if length_mm in entry:
+            return float(entry[length_mm]), True
+        if "price" in entry:
+            value = entry["price"]
+            return (float(value) if value is not None else None), False
+        numeric = [v for k, v in entry.items() if isinstance(k, (int, float))]
+        return None, bool(numeric)
+    if isinstance(entry, (int, float)):
+        return float(entry), False
+    return None, False
+
+
 def cut_boards(parts, prices=None, kerf=stock.KERF):
     """Cheapest mix of sale lengths. `prices` maps stock class -> {length_mm: price}."""
     todo, unplaced = [], []
@@ -244,10 +266,13 @@ def cut_boards(parts, prices=None, kerf=stock.KERF):
             boards = _ffd(lengths, stock_len, kerf)
             if boards is None:
                 continue
-            if prices and cls in prices and stock_len in prices[cls]:
-                cost = len(boards) * prices[cls][stock_len]
+            price, length_table = _price_for_length(prices, cls, stock_len)
+            if length_table and price is None:
+                continue                                  # unpriced length in a partial table
+            if price is not None:
+                cost = len(boards) * price
             else:
-                cost = len(boards) * stock_len          # fall back to purchased length
+                cost = len(boards) * stock_len            # no prices: rank by purchased length
             # kerfs actually cut: a board holding k parts is cut k-1 times
             waste = (len(boards) * stock_len - sum(lengths)
                      - kerf * (len(lengths) - len(boards)))

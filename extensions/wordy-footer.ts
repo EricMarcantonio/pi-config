@@ -14,17 +14,44 @@
  *   model   -> ctx.model
  *   branch  -> footerData.getGitBranch()
  *
- * Toggle at runtime with /footer-words (defaults to enabled).
+ * Toggle at runtime with /footer-words. The choice is persisted to
+ * settings.json as "wordyFooter" so it syncs with the rest of the config.
  */
 
 import type { AssistantMessage } from "@earendil-works/pi-ai";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 const HOME = process.env.HOME || process.env.USERPROFILE || homedir();
+const CONFIG_DIR = process.env.PI_CODING_AGENT_DIR || join(HOME, ".pi", "agent");
+const SETTINGS_PATH = join(CONFIG_DIR, "settings.json");
+
+/** Read the persisted "wordyFooter" flag (defaults to true). */
+function readWordyEnabled(): boolean {
+	try {
+		const raw = JSON.parse(readFileSync(SETTINGS_PATH, "utf8")) as { wordyFooter?: boolean };
+		return raw.wordyFooter !== false;
+	} catch {
+		return true;
+	}
+}
+
+/** Persist the "wordyFooter" flag, preserving all other settings keys. */
+function writeWordyEnabled(enabled: boolean): void {
+	try {
+		const raw = existsSync(SETTINGS_PATH)
+			? (JSON.parse(readFileSync(SETTINGS_PATH, "utf8")) as Record<string, unknown>)
+			: {};
+		raw.wordyFooter = enabled;
+		mkdirSync(dirname(SETTINGS_PATH), { recursive: true });
+		writeFileSync(SETTINGS_PATH, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+	} catch {
+		// best effort; footer still toggles for this session
+	}
+}
 
 /** Same formatting thresholds as the built-in footer. */
 function formatTokens(count: number): string {
@@ -47,7 +74,7 @@ function formatCwd(cwd: string): string {
 
 /** Read compaction.enabled from settings.json (defaults to true). */
 function readAutoCompact(): boolean {
-	const dir = process.env.PI_CODING_AGENT_DIR || join(HOME, ".pi", "agent");
+	const dir = CONFIG_DIR;
 	try {
 		const raw = JSON.parse(readFileSync(join(dir, "settings.json"), "utf8")) as {
 			compaction?: boolean | { enabled?: boolean };
@@ -173,24 +200,23 @@ function applyWordyFooter(ctx: ExtensionContext): void {
 }
 
 export default function (pi: ExtensionAPI) {
-	let enabled = true;
-
 	pi.on("session_start", (_event, ctx) => {
 		if (!ctx.hasUI) return;
-		if (enabled) applyWordyFooter(ctx);
+		if (readWordyEnabled()) applyWordyFooter(ctx);
 	});
 
 	pi.registerCommand("footer-words", {
-		description: "Toggle wordy footer (words instead of ↑ ↓ R W CH symbols)",
+		description: "Toggle wordy footer (words instead of ↑ ↓ R W CH symbols); choice is saved to settings.json",
 		handler: async (_args, ctx) => {
 			if (!ctx.hasUI) return;
-			enabled = !enabled;
-			if (enabled) {
+			const next = !readWordyEnabled();
+			writeWordyEnabled(next);
+			if (next) {
 				applyWordyFooter(ctx);
-				ctx.ui.notify("Wordy footer enabled", "info");
+				ctx.ui.notify("Wordy footer enabled (saved to settings.json)", "info");
 			} else {
 				ctx.ui.setFooter(undefined);
-				ctx.ui.notify("Default footer restored", "info");
+				ctx.ui.notify("Default footer restored (saved to settings.json)", "info");
 			}
 		},
 	});

@@ -48,4 +48,4 @@ pi install git:github.com/obra/superpowers
 - **Costs** are USD per 1M tokens, off-peak rates only (pi has no time-of-day pricing; Ollama peak, Mon–Fri 12–18 UTC, is ~2×).
 - **Context windows** come from `ollama show <model>`.
 - **No secrets** are stored here (`apiKey` is the literal `"ollama"`).
-- **Wordy footer**: `extensions/wordy-footer.ts` replaces pi's symbol footer (`↑ ↓ R W CH`) with words (`input`, `output`, `cache-read`, `cache-hit`, `cost`, `context`). Toggle at runtime with `/footer-words`. Delete the file to restore the default footer.
+- **Wordy footer**: `extensions/wordy-footer.ts` replaces pi's symbol footer (`↑ ↓ R W CH`) with words (`input`, `output`, `cache-read`, `cache-hit`, `cost`, `context`). Toggle at runtime with `/footer-words`; the choice is saved to `settings.json` as `"wordyFooter"`, so it syncs across machines. Delete the extension file to restore the default footer permanently.

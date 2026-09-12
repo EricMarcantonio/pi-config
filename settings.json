@@ -4,6 +4,7 @@
   "hideThinkingBlock": true,
   "lastChangelogVersion": "0.85.1",
   "theme": "dark",
+  "wordyFooter": true,
   "packages": [
     "npm:@ollama/pi-web-search",
     "npm:pi-caveman",

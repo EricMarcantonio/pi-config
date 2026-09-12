@@ -1233,6 +1233,14 @@ class TestFrame(unittest.TestCase):
         front = [p for p in blocking if p.id == "blocking_front"][0]
         self.assertEqual(front.qty, 7)                     # 8 stud positions -> 7 bays
 
+    def test_blocking_fits_the_actual_bay(self):
+        # studs sit at span/n, so the clear bay is the step minus a stud's thickness
+        parts = derive(spec())
+        front = [p for p in parts if p.id == "blocking_front"][0]
+        self.assertAlmostEqual(front.w, 2788.92 / 8 - 38.0, places=1)    # 310.6 mm
+        left = [p for p in parts if p.id == "blocking_left"][0]
+        self.assertAlmostEqual(left.w, 2179.32 / 7 - 38.0, places=1)     # 273.3 mm
+
     def test_glazing_is_panelised_too(self):
         # a pane wider than a 610 x 1220 polycarbonate sheet must be split
         s = spec()
@@ -1358,10 +1366,15 @@ def _blocking(spec, wall, parts):
     """Solid blocking between studs at the roof bearing line."""
     span = _wall_span(spec, wall)
     spacing = float(spec.data["wall"].get("spacing", STUD_SPACING_DEFAULT))
-    bays = max(0, len(stud_positions(span, spacing)) - 1)
+    positions = stud_positions(span, spacing)
+    bays = max(0, len(positions) - 1)
     if bays:
+        # studs are laid out evenly at span/n, not at the nominal spacing, so the
+        # clear bay is step - stud thickness (the nominal spacing would over-length
+        # blocking by 8 mm on the long walls and 43 mm on the side walls)
+        step = span / len(positions)
         parts.append(Part(id="blocking_%s" % wall,
-                          w=round(spacing - stock.board_dims("2x4")[0], 2),
+                          w=round(step - stock.board_dims("2x4")[0], 2),
                           h=stock.board_dims("2x4")[1], qty=bays, stock="2x4",
                           assembly="wall_%s" % wall,
                           note="blocking at the roof bearing line"))
@@ -1528,7 +1541,7 @@ def summary(parts):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd ~/.pi/agent/skills/building-from-reference/scripts && python3 -m unittest tests.test_frame -v`
-Expected: PASS (14 tests).
+Expected: PASS (15 tests).
 
 - [ ] **Step 5: Commit**
 

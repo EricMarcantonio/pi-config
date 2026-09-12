@@ -1043,6 +1043,7 @@ import unittest
 
 from woodbuild.frame import derive, header_depth_for_span, stud_positions, summary
 from woodbuild.spec import BuildSpec
+from woodbuild import stock
 
 SPEC = {
     "build": "unit-test",
@@ -1120,6 +1121,29 @@ class TestFrame(unittest.TestCase):
         panes = [p for p in derive(spec()) if p.id.startswith(("band_pane", "transom_pane"))]
         self.assertTrue(panes)
         self.assertTrue(all(p.stock == "polycarbonate_6" for p in panes))
+        # glazing is the band height minus two 40 mm rails, not the whole band
+        band_pane = [p for p in panes if p.id.startswith("band_pane")][0]
+        self.assertAlmostEqual(band_pane.h, 220.0)
+
+    def test_surfaces_are_panelised_to_fit_a_sheet(self):
+        s = spec()
+        sw, sh = stock.sheet_size("smartside_grooved")
+        for p in derive(s):
+            if p.id.startswith(("sheathing_", "siding_", "deck", "roof_deck")):
+                self.assertLessEqual(max(p.w, p.h), max(sw, sh) + 1e-6, p.id)
+                self.assertLessEqual(min(p.w, p.h), min(sw, sh) + 1e-6, p.id)
+                self.assertGreater(p.qty, 0)
+
+    def test_studs_stop_at_the_roof_underside(self):
+        s = spec()
+        stud = [p for p in derive(s) if p.id == "stud_front"][0]
+        self.assertAlmostEqual(stud.w, s.wall_top_front())
+        self.assertAlmostEqual(stud.w, 2138.06, places=1)   # 2258.06 - 120 mm build-up
+
+    def test_door_opening_has_no_sill_plate(self):
+        ids = [p.id for p in derive(spec())]
+        self.assertNotIn("sill_door", ids)
+        self.assertIn("sill_band", ids)
 
     def test_summary_counts_by_assembly(self):
         s = summary(derive(spec()))
@@ -1188,6 +1212,27 @@ def _wall_span(spec, wall):
     return env["width"] if wall in ("front", "back") else env["depth"]
 
 
+def _split_surface(pid, w, h, cls, assembly, note, grain_locked=True):
+    """Tile a surface into sheet-sized panels.
+
+    A 2788.92 mm wall face cannot come off a 1219 mm sheet, so every surface is
+    panelised before it reaches the optimiser. One Part per distinct tile size
+    (qty = tile count) keeps the cutlist readable.
+    """
+    sw, sh = stock.sheet_size(cls)
+    gap = stock.KERF
+    nx = max(1, int(math.ceil(w / (sw - gap))))
+    ny = max(1, int(math.ceil(h / (sh - gap))))
+    tw = (w - gap * (nx - 1)) / nx
+    th = (h - gap * (ny - 1)) / ny
+    if tw > sw - gap or th > sh - gap:
+        raise ValueError("panel %s still exceeds a %s sheet: %.1f x %.1f"
+                         % (pid, cls, tw, th))
+    return Part(id=pid, w=round(tw, 2), h=round(th, 2), qty=nx * ny, stock=cls,
+                assembly=assembly, grain_locked=grain_locked,
+                note="%s (%d x %d panels)" % (note, nx, ny))
+
+
 def _wall_plates(spec, wall, parts):
     env = spec.envelope
     span = _wall_span(spec, wall)
@@ -1196,7 +1241,7 @@ def _wall_plates(spec, wall, parts):
                 note="PT sole plate, ground contact")
     top = Part(id="top_plate_%s" % wall, w=span, h=stock.board_dims("2x4")[1],
                qty=2, stock="2x4", assembly="wall_%s" % wall,
-               note="single top plate + bearing plate")
+               note="single top plate + bearing plate (sloped bearing cut on site)")
     parts.extend([sole, top])
 
 
@@ -1204,7 +1249,9 @@ def _wall_studs(spec, wall, parts):
     span = _wall_span(spec, wall)
     spacing = float(spec.data["wall"].get("spacing", STUD_SPACING_DEFAULT))
     studs = stud_positions(span, spacing)
-    parts.append(Part(id="stud_%s" % wall, w=float(spec.envelope["height_tall"]),
+    # studs stop at the roof underside, not the roof top: the 120 mm build-up is
+    # rafters, deck and steel, none of which a stud spans
+    parts.append(Part(id="stud_%s" % wall, w=round(spec.wall_top_front(), 2),
                       h=stock.board_dims("2x4")[1], qty=len(studs), stock="2x4",
                       assembly="wall_%s" % wall,
                       note="studs @ %.1f mm o.c." % spacing))
@@ -1212,7 +1259,7 @@ def _wall_studs(spec, wall, parts):
 
 def _corners(spec, parts):
     for tag in ("FL", "FR", "BL", "BR"):
-        parts.append(Part(id="corner_stud_" + tag, w=float(spec.envelope["height_tall"]),
+        parts.append(Part(id="corner_stud_" + tag, w=round(spec.wall_top_front(), 2),
                           h=stock.board_dims("2x4")[1], qty=3, stock="2x4",
                           assembly="corner_%s" % tag,
                           note="3-stud corner replacing the moulded 45x45 post"))
@@ -1225,7 +1272,7 @@ def _opening_frame(spec, opening, parts):
     height = float(opening["height"])
     head = float(opening["sill"]) + height
     assembly = "%s_%s" % (wall, kind)
-    tall = float(spec.envelope["height_tall"])
+    tall = round(spec.wall_top_front(), 2)
 
     header_cls = opening.get("header") or header_class_for_span(width)
     parts.append(Part(id="king_%s" % kind, w=tall, h=stock.board_dims("2x4")[1],
@@ -1239,11 +1286,12 @@ def _opening_frame(spec, opening, parts):
     cripple_len = tall - head
     if cripple_len > 50.0:
         n = max(1, int(math.ceil(width / 406.4)) - 1)
-        parts.append(Part(id="cripple_%s" % kind, w=cripple_len,
+        parts.append(Part(id="cripple_%s" % kind, w=round(cripple_len, 2),
                           h=stock.board_dims("2x4")[1], qty=n, stock="2x4",
                           assembly=assembly, note="cripples above the head"))
-    parts.append(Part(id="sill_%s" % kind, w=width, h=stock.board_dims("2x4")[1],
-                      qty=1, stock="2x4", assembly=assembly, note="sill plate"))
+    if kind != "door":                      # a door has no sill plate to trip over
+        parts.append(Part(id="sill_%s" % kind, w=width, h=stock.board_dims("2x4")[1],
+                          qty=1, stock="2x4", assembly=assembly, note="sill plate"))
 
 
 def _glazing(spec, parts):
@@ -1254,12 +1302,13 @@ def _glazing(spec, parts):
         mullions = int(b.get("mullions", len(panes) - 1))
         usable = float(b["width"])
         total = float(sum(panes))
+        glass_h = float(b["height"]) - 2.0 * float(spec.data.get("band_rail", 40.0))
         for i, frac in enumerate(panes, start=1):
-            parts.append(Part(id="band_pane_%d" % i, w=usable * frac / total,
-                              h=float(b["height"]), qty=1, stock="polycarbonate_6",
+            parts.append(Part(id="band_pane_%d" % i, w=round(usable * frac / total, 2),
+                              h=round(glass_h, 2), qty=1, stock="polycarbonate_6",
                               assembly="glazing_front",
                               note="clerestory pane %d of %d" % (i, len(panes))))
-        parts.append(Part(id="band_mullion", w=float(b["height"]),
+        parts.append(Part(id="band_mullion", w=round(float(b["height"]), 2),
                           h=stock.board_dims("2x4")[1], qty=mullions, stock="2x4",
                           assembly="glazing_front", note="mullions between panes"))
     for wall in ("left", "right"):
@@ -1286,9 +1335,8 @@ def _floor(spec, parts):
                       qty=n_joists, stock=f["joist"], assembly="floor",
                       note="PT joists @ %.1f mm o.c." % spacing))
     w, h = stock.sheet_size(f["deck"])
-    parts.append(Part(id="deck", w=clear_w, h=clear_d, qty=1, stock=f["deck"],
-                      assembly="floor", grain_locked=True,
-                      note="T&G deck, %dx%d mm sheets" % (w, h)))
+    parts.append(_split_surface("deck", clear_w, clear_d, f["deck"], "floor",
+                                "T&G deck, %dx%d mm sheets" % (w, h)))
 
 
 def _roof(spec, parts):
@@ -1304,22 +1352,20 @@ def _roof(spec, parts):
     ov = r.get("overhang", {})
     w = env["width"] + 2 * float(ov.get("side", 0.0))
     d = env["depth"] + float(ov.get("front", 0.0)) + float(ov.get("back", 0.0))
-    parts.append(Part(id="roof_deck", w=w, h=d, qty=1, stock=r["deck"],
-                      assembly="roof", grain_locked=True, note="OSB deck + steel covering"))
+    parts.append(_split_surface("roof_deck", w, d, r["deck"], "roof",
+                                "OSB deck + steel covering"))
 
 
 def _walls(spec, parts):
     env = spec.envelope
-    build_up = spec.wall_build_up()
     for wall in WALL_NAMES:
         span = _wall_span(spec, wall)
-        h = float(env["height_tall"])
-        parts.append(Part(id="sheathing_%s" % wall, w=span, h=h, qty=1,
-                          stock="osb_7_16", assembly="wall_%s" % wall,
-                          note="OSB sheathing"))
-        parts.append(Part(id="siding_%s" % wall, w=span, h=h, qty=1,
-                          stock="smartside_grooved", assembly="wall_%s" % wall,
-                          grain_locked=True, note="grooved siding laid horizontally"))
+        h = round(spec.wall_top_front(), 2)
+        parts.append(_split_surface("sheathing_%s" % wall, span, h, "osb_7_16",
+                                    "wall_%s" % wall, "OSB sheathing"))
+        parts.append(_split_surface("siding_%s" % wall, span, h, "smartside_grooved",
+                                    "wall_%s" % wall,
+                                    "grooved siding laid horizontally"))
         _wall_plates(spec, wall, parts)
         _wall_studs(spec, wall, parts)
 
@@ -1362,7 +1408,7 @@ def summary(parts):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd ~/.pi/agent/skills/building-from-reference/scripts && python3 -m unittest tests.test_frame -v`
-Expected: PASS (9 tests).
+Expected: PASS (13 tests).
 
 - [ ] **Step 5: Commit**
 

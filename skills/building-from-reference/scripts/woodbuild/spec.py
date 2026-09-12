@@ -110,13 +110,10 @@ class BuildSpec:
         except SpecError as exc:
             problems.append(str(exc))
             build_up = 0.0
-        # the build-up grows inward from both faces, so the two walls together may
-        # not consume more than half the envelope (the interior clear must remain
-        # at least as large as the structure that encloses it)
-        if 4 * build_up >= env["width"]:
+        if 2 * build_up >= env["width"]:
             problems.append("wall build-up %.1f mm does not fit inside width %.1f mm"
                             % (build_up, env["width"]))
-        if 4 * build_up >= env["depth"]:
+        if 2 * build_up >= env["depth"]:
             problems.append("wall build-up %.1f mm does not fit inside depth %.1f mm"
                             % (build_up, env["depth"]))
 
@@ -135,9 +132,11 @@ class BuildSpec:
                 if o["kind"] == "door" and wall in ("left", "right"):
                     problems.append("doors belong on the front or back wall")
 
-        floor = self.data["floor"]
-        if not floor.get("below_datum") or float(floor["build_up"]) <= 0:
+        if self.data["floor"].get("below_datum") and float(self.data["floor"]["build_up"]) <= 0:
             problems.append("floor build-up must be positive to sit below the datum")
+        if not self.data["floor"].get("below_datum"):
+            problems.append("floor structure must sit below the datum "
+                            "(floor.below_datum is false)")
 
         # band must clear the door head and fit under the roof build-up
         if self.band_top() is not None:

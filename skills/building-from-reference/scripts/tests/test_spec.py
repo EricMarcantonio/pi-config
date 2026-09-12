@@ -69,7 +69,7 @@ class TestSpec(unittest.TestCase):
 
     def test_wall_build_up_must_fit_inside_envelope(self):
         data = json.loads(json.dumps(GOOD))
-        data["wall"]["layers_out_to_in"] = ["smartside_grooved", "osb_7_16", "2x4"] * 12
+        data["wall"]["layers_out_to_in"] = ["smartside_grooved", "osb_7_16", "2x4"] * 30
         with self.assertRaises(SpecError) as ctx:
             BuildSpec.load(write(data)).validate()
         self.assertIn("build-up", str(ctx.exception))

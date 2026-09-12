@@ -103,8 +103,24 @@ class TestFrame(unittest.TestCase):
 
     def test_door_opening_has_no_sill_plate(self):
         ids = [p.id for p in derive(spec())]
-        self.assertNotIn("sill_door", ids)
-        self.assertIn("sill_band", ids)
+        self.assertNotIn("sill_front_door", ids)
+        self.assertIn("sill_front_band", ids)
+
+    def test_walls_have_blocking_at_the_bearing_line(self):
+        parts = derive(spec())
+        blocking = [p for p in parts if p.id.startswith("blocking_")]
+        self.assertEqual(len(blocking), 4)                 # one run per wall
+        front = [p for p in blocking if p.id == "blocking_front"][0]
+        self.assertEqual(front.qty, 7)                     # 8 stud positions -> 7 bays
+
+    def test_glazing_is_panelised_too(self):
+        # a pane wider than a 610 x 1220 polycarbonate sheet must be split
+        s = spec()
+        sw, sh = stock.sheet_size("polycarbonate_6")
+        for p in derive(s):
+            if p.id.startswith(("band_pane", "transom_pane")):
+                self.assertLessEqual(max(p.w, p.h), max(sw, sh) + 1e-6, p.id)
+                self.assertLessEqual(min(p.w, p.h), min(sw, sh) + 1e-6, p.id)
 
     def test_summary_counts_by_assembly(self):
         s = summary(derive(spec()))

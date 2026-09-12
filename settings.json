@@ -1,0 +1,12 @@
+{
+  "defaultModel": "deepseek-v4.1-flash:cloud",
+  "defaultProvider": "ollama",
+  "lastChangelogVersion": "0.85.1",
+  "theme": "dark",
+  "packages": [
+    "npm:@ollama/pi-web-search",
+    "npm:pi-caveman",
+    "git:github.com/obra/superpowers",
+    "npm:pi-mcp-extension"
+  ]
+}

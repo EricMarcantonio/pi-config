@@ -1,0 +1,14 @@
+# caches / installed packages / clones
+npm/
+git/
+bin/
+
+# secrets & machine state
+auth.json
+models-store.json
+
+# sessions & history
+sessions/
+
+# os noise
+.DS_Store

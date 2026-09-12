@@ -322,7 +322,8 @@ class TestSpec(unittest.TestCase):
 
     def test_wall_build_up_must_fit_inside_envelope(self):
         data = json.loads(json.dumps(GOOD))
-        data["wall"]["layers_out_to_in"] = ["smartside_grooved", "osb_7_16", "2x4"] * 12
+        # 30 x 111 mm = 3330 mm of layers on a 2788.92 mm wall: breach the envelope
+        data["wall"]["layers_out_to_in"] = ["smartside_grooved", "osb_7_16", "2x4"] * 30
         with self.assertRaises(SpecError) as ctx:
             BuildSpec.load(write(data)).validate()
         self.assertIn("build-up", str(ctx.exception))
@@ -516,6 +517,9 @@ class BuildSpec:
 
         if self.data["floor"].get("below_datum") and float(self.data["floor"]["build_up"]) <= 0:
             problems.append("floor build-up must be positive to sit below the datum")
+        if not self.data["floor"].get("below_datum"):
+            problems.append("floor structure must sit below the datum "
+                            "(floor.below_datum is false)")
 
         # band must clear the door head and fit under the roof build-up
         if self.band_top() is not None:
@@ -572,16 +576,23 @@ def P(pid, w, h, qty=1, cls="osb_7_16", grain_locked=False):
 
 class TestSheetNesting(unittest.TestCase):
     def test_two_halves_fill_one_sheet(self):
-        plans, unplaced = pack_sheets([P("a", 1219.0, 1219.0), P("b", 1219.0, 1219.0)])
+        # 1200 + 3 mm kerf + 1200 = 2403 <= 2438, so both panels share one sheet
+        plans, unplaced = pack_sheets([P("a", 1219.0, 1200.0), P("b", 1219.0, 1200.0)])
         self.assertEqual(unplaced, [])
         self.assertEqual(sum(p.count for p in plans), 1)
         self.assertEqual(len(plans[0].sheets[0]), 2)
 
-    def test_kerf_prevents_a_third_part(self):
-        # 1219*3 wide cannot fit in 2438 with 3 mm kerfs between them
-        plans, unplaced = pack_sheets([P("x", 1219.0, 800.0, qty=3)])
+    def test_kerf_decides_whether_the_second_row_fits(self):
+        # 1218 + kerf + 1218 = 2439 > 2438: the kerf pushes the second row onto a new sheet
+        plans, unplaced = pack_sheets([P("x", 1219.0, 1218.0, qty=2)])
         self.assertEqual(unplaced, [])
-        self.assertEqual(sum(p.count for p in plans), 3)   # 2 across on one sheet
+        self.assertEqual(sum(p.count for p in plans), 2)
+
+    def test_two_panels_share_a_shelf_across_the_width(self):
+        # 608 + 3 mm kerf + 608 = 1219 exactly, so both fit across the sheet
+        plans, unplaced = pack_sheets([P("w", 608.0, 1000.0, qty=2)])
+        self.assertEqual(unplaced, [])
+        self.assertEqual(sum(p.count for p in plans), 1)
         self.assertEqual(len(plans[0].sheets[0]), 2)
 
     def test_grain_locked_parts_never_rotate_even_when_it_would_fit(self):
@@ -618,8 +629,9 @@ class TestSheetNesting(unittest.TestCase):
                         self.assertFalse(xo and yo, "overlap %s/%s" % (a.part_id, b.part_id))
 
     def test_yield_and_area(self):
-        plans, _ = pack_sheets([P("a", 1219.0, 1219.0, qty=2)])
-        self.assertAlmostEqual(plans[0].yield_pct(), 100.0, places=1)
+        # two 1219 x 1200 panels on one 1219 x 2438 sheet: 98.4 % of the sheet is used
+        plans, _ = pack_sheets([P("a", 1219.0, 1200.0, qty=2)])
+        self.assertAlmostEqual(plans[0].yield_pct(), 98.4, places=1)
         self.assertAlmostEqual(parts_area([P("a", 100.0, 200.0, qty=3)]), 60000.0)
 
     def test_glazing_uses_its_own_sheet_class(self):
@@ -818,7 +830,7 @@ def pack_sheets(parts, kerf=stock.KERF):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd ~/.pi/agent/skills/building-from-reference/scripts && python3 -m unittest tests.test_optimise_sheets -v`
-Expected: PASS (7 tests). If `test_no_overlaps_and_inside_sheet_bounds` fails, the shelf-cursor bookkeeping is wrong — fix `new_sheet()`/`shelf_y` handling rather than loosening the assertion.
+Expected: PASS (9 tests) — three of them pin the kerf arithmetic (2403 fits, 2439 does not, 608+608+kerf exactly fills the width).
 
 - [ ] **Step 5: Commit**
 
@@ -837,7 +849,8 @@ git commit -m "woodbuild: kerf-aware 2D sheet nesting with grain locking"
 
 **Interfaces:**
 - Consumes: `Part`, `stock.board_lengths_mm`, `stock.KERF`.
-- Produces: `@dataclass BoardPlan(stock, length_mm, count, cuts: list[list[tuple[str, float]]])` with `.yield_pct()`, `.offcuts()`; `cut_boards(parts, prices=None, kerf=stock.KERF) -> tuple[list[BoardPlan], list[Part]]`; `board_cost(plan, prices) -> float`.
+- Produces: `@dataclass BoardPlan(stock, length_mm, count, cuts: list[list[tuple[str, float]]])` with `.yield_pct()`, `.offcuts()`; `cut_boards(parts, prices=None, kerf=stock.KERF) -> tuple[list[BoardPlan], list[Part]]`.
+  (A `board_cost()` helper was considered and dropped: no consumer needs it — `bom.py` prices plans from their counts.)
 
 - [ ] **Step 1: Write the failing test**
 
@@ -994,7 +1007,8 @@ def cut_boards(parts, prices=None, kerf=stock.KERF):
         if not candidates:
             unplaced.extend(group)
             continue
-        candidates.sort(key=lambda c: (c[0], c[1]))
+        # cheapest total, then least waste, then fewest boards, then shortest stock
+        candidates.sort(key=lambda c: (c[0], c[1], len(c[3]), c[2]))
         cost, waste, stock_len, boards = candidates[0]
 
         # assign real part ids to the cuts, longest first within each board

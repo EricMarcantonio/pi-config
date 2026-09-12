@@ -1489,7 +1489,7 @@ def summary(parts):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd ~/.pi/agent/skills/building-from-reference/scripts && python3 -m unittest tests.test_frame -v`
-Expected: PASS (13 tests).
+Expected: PASS (12 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -1557,6 +1557,15 @@ class TestBom(unittest.TestCase):
         self.assertIsNone(line.unit_price)
         self.assertIsNone(line.line_total())
         self.assertEqual([l.stock for l in unpriced([line])], ["osb_7_16"])
+
+    def test_parts_only_bom_omits_consumables(self):
+        # no spec -> the caller wants the priced plan only (this is how the tests
+        # below read one line per stock class)
+        lines = build_bom([], [SheetPlan(stock="osb_7_16", sheets=[[]])], [])
+        self.assertEqual([l.category for l in lines], ["sheets"])
+        # with a spec the derived fasteners, sealant and hardware come along
+        with_consumables = build_bom([], [], [], spec={"options": {}})
+        self.assertTrue(any(l.category == "fasteners" for l in with_consumables))
 
     def test_consumables_scale_with_joints(self):
         parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4"),
@@ -1650,7 +1659,8 @@ def build_bom(parts, sheet_plans, board_plans, prices=None, spec=None):
             unit_price=(entry or {}).get("price"), sku=(entry or {}).get("sku"),
             source=(entry or {}).get("source"),
             note="yield %.1f%%" % plan.yield_pct()))
-    lines.extend(consumables(spec or {}, parts))
+    if spec is not None:                     # a parts-only BOM omits the consumables
+        lines.extend(consumables(spec, parts))
     lines.sort(key=lambda l: (l.category, l.stock, l.description))
     return lines
 
@@ -1711,7 +1721,7 @@ def totals(lines, tax_rate):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd ~/.pi/agent/skills/building-from-reference/scripts && python3 -m unittest tests.test_bom -v`
-Expected: PASS (7 tests).
+Expected: PASS (8 tests).
 
 - [ ] **Step 5: Commit**
 

@@ -3,7 +3,8 @@ import os
 import tempfile
 import unittest
 
-from woodbuild.pricing import PriceCache, compare, resolve
+from woodbuild.pricing import (PriceCache, PriceError, PricingTransportError,
+                               StdioMCP, compare, resolve)
 from woodbuild.spec import BuildSpec
 
 
@@ -102,10 +103,82 @@ class TestPricing(unittest.TestCase):
         deltas = compare(old, new)
         self.assertEqual(deltas, [("2x4", 4.19, 4.49, 0.30)])
 
+    def test_refresh_only_touches_missing_or_stale_classes(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "7011", "province": "ON", "items": {
+            "2x4": {"sku": "1", "price": 4.19, "fetched": "2026-09-11"},      # fresh
+            "2x6": {"sku": "2", "price": 9.99, "fetched": "2026-01-01"}}}    # stale
+        spec = make_spec({"2x4": "2x4x8 SPF stud", "2x6": "2x6x8 SPF"})
+        transport = FakeTransport({"2x4x8 SPF stud": SEARCH_HIT,
+                                   "2x6x8 SPF": SEARCH_HIT})
+        resolve(spec, cache, transport=transport, refresh=True, today="2026-09-12")
+        self.assertEqual([c[1]["query"] for c in transport.calls], ["2x6x8 SPF"])
+
+    def test_transport_error_marks_unpriced_with_its_own_reason(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "7011", "province": "ON", "items": {}}
+        spec = make_spec({"2x4": "2x4x8 SPF stud"})
+
+        class Exploding:
+            def call(self, tool, arguments):
+                raise PricingTransportError("server died")
+
+        prices = resolve(spec, cache, transport=Exploding(), refresh=True,
+                         today="2026-09-12")
+        self.assertNotIn("2x4", prices)
+        self.assertIn("server died", cache.data["unpriced"]["2x4"]["reason"])
+
+    def test_cache_for_another_store_is_a_hard_error(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "7001", "province": "ON", "items": {}}
+        spec = make_spec({"2x4": "2x4x8 SPF stud"})
+        with self.assertRaises(PriceError):
+            resolve(spec, cache, transport=None)
+
     def test_tax_rate_lookup(self):
         from woodbuild.pricing import tax_rate_for
         self.assertEqual(tax_rate_for("ON"), 0.13)
         self.assertEqual(tax_rate_for("AB"), 0.05)
+
+
+class TestStdioMCP(unittest.TestCase):
+    """Drives a real stub server over stdio: the transport is not mocked."""
+
+    STUB = '''
+import json, sys
+
+def send(obj):
+    sys.stdout.write(json.dumps(obj) + "\\n")
+    sys.stdout.flush()
+
+for line in sys.stdin:
+    msg = json.loads(line)
+    if msg.get("method") == "initialize":
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"serverInfo": {"name": "stub"}}})
+    elif msg.get("method") == "tools/call":
+        # noise first: a notification must not be mistaken for the reply
+        send({"jsonrpc": "2.0", "method": "notifications/message", "params": {}})
+        send({"jsonrpc": "2.0", "id": msg["id"], "result": {"content": [
+            {"type": "text", "text": json.dumps({
+                "products": [{"sku": "1000123456", "name": "2x4x8 SPF Stud",
+                              "price": 2.5, "inStockOnline": True}]})}]}})
+'''
+
+    def test_handshake_and_id_matched_call(self):
+        import os
+        import sys
+        import tempfile
+        fd, path = tempfile.mkstemp(suffix="-stub-mcp.py")
+        with os.fdopen(fd, "w") as fh:
+            fh.write(self.STUB)
+        client = StdioMCP(sys.executable, [path])
+        try:
+            payload = client.call("hd_search", {"query": "2x4x8 SPF stud"})
+        finally:
+            client.close()
+            os.unlink(path)
+        self.assertEqual(payload["products"][0]["sku"], "1000123456")
+        self.assertEqual(payload["products"][0]["price"], 2.5)
 
 
 if __name__ == "__main__":

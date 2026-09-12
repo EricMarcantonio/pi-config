@@ -39,6 +39,9 @@ def cli_main(argv=None):
     try:
         prices = pricing.resolve(spec, cache, transport=transport, refresh=args.fetch,
                                  today=args.today)
+    except pricing.PriceError as exc:
+        print("pricing error: %s" % exc, file=sys.stderr)
+        return 2
     finally:
         if transport:
             transport.close()

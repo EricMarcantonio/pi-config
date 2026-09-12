@@ -1223,8 +1223,24 @@ class TestFrame(unittest.TestCase):
 
     def test_door_opening_has_no_sill_plate(self):
         ids = [p.id for p in derive(spec())]
-        self.assertNotIn("sill_door", ids)
-        self.assertIn("sill_band", ids)
+        self.assertNotIn("sill_front_door", ids)
+        self.assertIn("sill_front_band", ids)
+
+    def test_walls_have_blocking_at_the_bearing_line(self):
+        parts = derive(spec())
+        blocking = [p for p in parts if p.id.startswith("blocking_")]
+        self.assertEqual(len(blocking), 4)                 # one run per wall
+        front = [p for p in blocking if p.id == "blocking_front"][0]
+        self.assertEqual(front.qty, 7)                     # 8 stud positions -> 7 bays
+
+    def test_glazing_is_panelised_too(self):
+        # a pane wider than a 610 x 1220 polycarbonate sheet must be split
+        s = spec()
+        sw, sh = stock.sheet_size("polycarbonate_6")
+        for p in derive(s):
+            if p.id.startswith(("band_pane", "transom_pane")):
+                self.assertLessEqual(max(p.w, p.h), max(sw, sh) + 1e-6, p.id)
+                self.assertLessEqual(min(p.w, p.h), min(sw, sh) + 1e-6, p.id)
 
     def test_summary_counts_by_assembly(self):
         s = summary(derive(spec()))
@@ -1338,6 +1354,19 @@ def _wall_studs(spec, wall, parts):
                       note="studs @ %.1f mm o.c." % spacing))
 
 
+def _blocking(spec, wall, parts):
+    """Solid blocking between studs at the roof bearing line."""
+    span = _wall_span(spec, wall)
+    spacing = float(spec.data["wall"].get("spacing", STUD_SPACING_DEFAULT))
+    bays = max(0, len(stud_positions(span, spacing)) - 1)
+    if bays:
+        parts.append(Part(id="blocking_%s" % wall,
+                          w=round(spacing - stock.board_dims("2x4")[0], 2),
+                          h=stock.board_dims("2x4")[1], qty=bays, stock="2x4",
+                          assembly="wall_%s" % wall,
+                          note="blocking at the roof bearing line"))
+
+
 def _corners(spec, parts):
     for tag in ("FL", "FR", "BL", "BR"):
         parts.append(Part(id="corner_stud_" + tag, w=round(spec.wall_top_front(), 2),
@@ -1356,22 +1385,26 @@ def _opening_frame(spec, opening, parts):
     tall = round(spec.wall_top_front(), 2)
 
     header_cls = opening.get("header") or header_class_for_span(width)
-    parts.append(Part(id="king_%s" % kind, w=tall, h=stock.board_dims("2x4")[1],
+    # ids carry the wall: a left and a right transom are different parts
+    parts.append(Part(id="king_%s_%s" % (wall, kind), w=tall,
+                      h=stock.board_dims("2x4")[1],
                       qty=2, stock="2x4", assembly=assembly,
                       note="king studs both sides of the opening"))
-    parts.append(Part(id="jack_%s" % kind, w=height, h=stock.board_dims("2x4")[1],
+    parts.append(Part(id="jack_%s_%s" % (wall, kind), w=height,
+                      h=stock.board_dims("2x4")[1],
                       qty=2, stock="2x4", assembly=assembly, note="jack/trim studs"))
-    parts.append(Part(id="header_%s" % kind, w=width,
+    parts.append(Part(id="header_%s_%s" % (wall, kind), w=width,
                       h=stock.board_dims(header_cls)[1], qty=2, stock=header_cls,
                       assembly=assembly, note="doubled header, %s" % header_cls))
     cripple_len = tall - head
     if cripple_len > 50.0:
         n = max(1, int(math.ceil(width / 406.4)) - 1)
-        parts.append(Part(id="cripple_%s" % kind, w=round(cripple_len, 2),
+        parts.append(Part(id="cripple_%s_%s" % (wall, kind), w=round(cripple_len, 2),
                           h=stock.board_dims("2x4")[1], qty=n, stock="2x4",
                           assembly=assembly, note="cripples above the head"))
     if kind != "door":                      # a door has no sill plate to trip over
-        parts.append(Part(id="sill_%s" % kind, w=width, h=stock.board_dims("2x4")[1],
+        parts.append(Part(id="sill_%s_%s" % (wall, kind), w=width,
+                          h=stock.board_dims("2x4")[1],
                           qty=1, stock="2x4", assembly=assembly, note="sill plate"))
 
 
@@ -1385,20 +1418,25 @@ def _glazing(spec, parts):
         total = float(sum(panes))
         glass_h = float(b["height"]) - 2.0 * float(spec.data.get("band_rail", 40.0))
         for i, frac in enumerate(panes, start=1):
-            parts.append(Part(id="band_pane_%d" % i, w=round(usable * frac / total, 2),
-                              h=round(glass_h, 2), qty=1, stock="polycarbonate_6",
-                              assembly="glazing_front",
-                              note="clerestory pane %d of %d" % (i, len(panes))))
+            # panes are panelised too: a legal single-pane band is 2610.92 mm wide
+            # and a polycarbonate sheet is 610 x 1220
+            parts.append(_split_surface("band_pane_%d" % i,
+                                        round(usable * frac / total, 2),
+                                        round(glass_h, 2), "polycarbonate_6",
+                                        "glazing_front",
+                                        "clerestory pane %d of %d" % (i, len(panes)),
+                                        grain_locked=False))
         parts.append(Part(id="band_mullion", w=round(float(b["height"]), 2),
                           h=stock.board_dims("2x4")[1], qty=mullions, stock="2x4",
                           assembly="glazing_front", note="mullions between panes"))
     for wall in ("left", "right"):
         for o in spec.openings(wall):
             if o["kind"] == "transom":
-                parts.append(Part(id="transom_pane_%s" % wall, w=float(o["width"]),
-                                  h=float(o["height"]), qty=1, stock="polycarbonate_6",
-                                  assembly="glazing_%s" % wall,
-                                  note="side transom glazing"))
+                parts.append(_split_surface("transom_pane_%s" % wall,
+                                            float(o["width"]), float(o["height"]),
+                                            "polycarbonate_6", "glazing_%s" % wall,
+                                            "side transom glazing",
+                                            grain_locked=False))
 
 
 def _floor(spec, parts):
@@ -1449,6 +1487,7 @@ def _walls(spec, parts):
                                     "grooved siding laid horizontally"))
         _wall_plates(spec, wall, parts)
         _wall_studs(spec, wall, parts)
+        _blocking(spec, wall, parts)
 
 
 def _doors(spec, parts):
@@ -1489,7 +1528,7 @@ def summary(parts):
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd ~/.pi/agent/skills/building-from-reference/scripts && python3 -m unittest tests.test_frame -v`
-Expected: PASS (12 tests).
+Expected: PASS (14 tests).
 
 - [ ] **Step 5: Commit**
 

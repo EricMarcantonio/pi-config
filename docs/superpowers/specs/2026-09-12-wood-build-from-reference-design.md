@@ -200,7 +200,9 @@ Cache-first so budgets are reproducible and price drift is reviewable in git.
 
 ## Workbook (`report.py`)
 
-Reading order: header (build, store, cache timestamp, currency, generator version) → summary cards (subtotal, HST 13 %, total, line count, unpriced count, sheet yield, offcut value) → **deviations table** → framing schedule → sheet-goods schedule with per-sheet yield bars and part placement → cutlist (part, qty, finished size, stock, grain lock, source sheet/board) → BOM grouped by category with SKU, description, qty, unit price, line total, link → methodology, assumptions, provenance. Styling reuses the dark theme of `~/freecad/views/index.html`.
+Reading order: header (build, store, cache timestamp, currency, generator version) → summary cards (subtotal, HST 13 %, total, line count, unpriced count, sheet yield, offcut value) → **deviations table** → framing schedule → sheet-goods schedule with per-sheet yield bars and part placement → cutlist (part, qty, finished size, stock, grain lock, source sheet/board) → BOM grouped by category with SKU, description, qty, unit price, line total, link → methodology, assumptions, provenance.
+
+The summary cards are a headline, not an itemised cost: **the deviations table precedes every itemised cost table** so constraints are read before the money that pays for them. Styling reuses the dark theme of `~/freecad/views/index.html`.
 
 Exports: `cutlist.csv`, `cart.csv`, `sku-qty.txt` (paste-ready `SKU qty` lines).
 

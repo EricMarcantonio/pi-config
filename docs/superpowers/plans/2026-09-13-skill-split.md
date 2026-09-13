@@ -2163,6 +2163,11 @@ SKILLS = pathlib.Path(__file__).resolve().parents[4] / "skills"
 STORE_WORDS = ("Home Depot", "homedepot.ca", "homedepot.com", "hd_search",
                "hd_product", "HD_DEFAULT_STORE", "MicroPro")
 STORE_OWNER = "homedepot-catalogue"
+# The six visible skills this split owns. Every one of them must name the engine it
+# uses. The two pre-existing FreeCAD skills are deliberately absent: they use no
+# engine, they are only scanned for store knowledge.
+ENGINE_USERS = {"building-from-reference", "wood-framing", "sheet-and-board-nesting",
+                "build-pricing", "homedepot-catalogue", "freecad-model-to-spec"}
 # The two files whose job is to name the store in order to check the seam. Their
 # names are the whole exemption: any other file naming it is a regression.
 STORE_NAMING_ALLOWED = {"test_boundaries.py", "test_adapters.py"}
@@ -2229,14 +2234,20 @@ class TestSkillsAreWellFormed(unittest.TestCase):
                 hidden.add(path.parent.name)
         self.assertEqual(hidden, {"woodbuild-engine"})
 
-    def test_every_visible_skill_points_at_the_engine(self):
-        for path in skill_dirs():
-            if path.parent.name == "woodbuild-engine":
-                continue
-            with self.subTest(skill=path.parent.name):
-                text = path.read_text()
-                self.assertIn("woodbuild-engine", text,
+    def test_every_skill_this_split_owns_points_at_the_engine(self):
+        for name in sorted(ENGINE_USERS):
+            path = SKILLS / name / "SKILL.md"
+            with self.subTest(skill=name):
+                self.assertTrue(path.exists(), "missing skill %s" % name)
+                self.assertIn("woodbuild-engine", path.read_text(),
                               "%s does not name the engine it depends on" % path)
+
+    def test_the_unrelated_freecad_skills_are_left_out_of_the_engine_rule(self):
+        # They predate this split and use no engine; they are inside the store scan
+        # above, and they hold no store tokens.
+        for name in ("freecad-model-hygiene", "freecad-render-views"):
+            self.assertTrue((SKILLS / name / "SKILL.md").exists())
+            self.assertNotIn(name, ENGINE_USERS)
 
 
 if __name__ == "__main__":
@@ -2250,7 +2261,7 @@ cd /Users/eric/pi-config
 python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -t skills/woodbuild-engine/scripts 2>&1 | grep -E "^(Ran|OK|FAILED)|^(FAIL|ERROR):"
 ```
 
-Expected: `Ran 149 tests`, `OK (skipped=9)`. Any failure names the file that broke the
+Expected: `Ran 150 tests`, `OK (skipped=9)`. Any failure names the file that broke the
 split — fix that file, not the test.
 
 - [ ] **Step 3: Commit**
@@ -2330,7 +2341,7 @@ cd /Users/eric/pi-config
 python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -t skills/woodbuild-engine/scripts 2>&1 | grep -E "^(Ran|OK|FAILED)"
 ```
 
-Expected: `Ran 149 tests`, `OK (skipped=9)`.
+Expected: `Ran 150 tests`, `OK (skipped=9)`.
 
 - [ ] **Step 4: End-to-end offline run against a fresh workspace**
 

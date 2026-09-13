@@ -175,8 +175,13 @@ class StdioMCP:
                 pass
 
 
-def put_matched(cache, cls, entry, why, today=None):
-    """Record an agent's match. Requires a sku; stamps provenance."""
+def put_matched(cache, cls, entry, why, today=None, pack=None):
+    """Record an agent's match. Requires a sku; stamps provenance.
+
+    `pack` is the pack size the price is for, e.g. "50 count" or "295 ml". It
+    travels with the match because a per-pack price may only price a pack, never
+    a count of pieces. A missing pack is honestly "unknown", never guessed.
+    """
     if not entry or not entry.get("sku"):
         raise ValueError("an agent match needs a sku for class %r" % (cls,))
     today = today or date.today().isoformat()
@@ -186,6 +191,8 @@ def put_matched(cache, cls, entry, why, today=None):
     rec["why"] = why
     rec.setdefault("source", "hd_product")
     rec.setdefault("fetched", today)
+    if pack:
+        rec["pack"] = pack
     cache.put(cls, rec)
     cache.data.setdefault("unpriced", {}).pop(cls, None)
     return rec
@@ -237,7 +244,7 @@ def candidates(spec, transport, classes=None):
     return out
 
 
-def set_price(cache, cls, sku, why, transport, store=None, today=None):
+def set_price(cache, cls, sku, why, transport, store=None, today=None, pack=None):
     """Verify the SKU with hd_product, then record name/url/price + provenance.
 
     `store` must come from the spec: a cache that has never been written has no
@@ -254,7 +261,7 @@ def set_price(cache, cls, sku, why, transport, store=None, today=None):
     entry = {"sku": sku, "desc": payload.get("name"),
              "price": float(payload["price"]), "url": payload.get("url"),
              "source": "hd_product", "fetched": today}
-    return put_matched(cache, cls, entry, why, today=today)
+    return put_matched(cache, cls, entry, why, today=today, pack=pack)
 
 
 def resolve(spec, cache, transport=None, refresh=False, today=None):

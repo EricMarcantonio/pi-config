@@ -22,6 +22,8 @@ def cli_main(argv=None):
                     help="write search candidates for every class needing an agent match")
     ap.add_argument("--set-price", nargs=2, metavar=("CLASS", "SKU"),
                     help="verify an agent-chosen SKU over MCP and record the match")
+    ap.add_argument("--pack", default=None, metavar="TEXT",
+                    help="pack size the matched price is for, e.g. '50 count' or '295 ml'")
     ap.add_argument("--why", default=None, help="why the agent chose that product")
     ap.add_argument("--compare", help="old prices.json to diff against")
     ap.add_argument("--today", default=None)
@@ -61,14 +63,15 @@ def cli_main(argv=None):
             try:
                 pricing.set_price(cache, cls, sku, args.why or "", transport,
                                   store=spec.data.get("pricing", {}).get("store"),
-                                  today=args.today)
+                                  today=args.today, pack=args.pack)
             except (pricing.PriceError, pricing.PricingTransportError) as exc:
                 print("pricing error: %s" % exc, file=sys.stderr)
                 return 2
             cache.save()
             entry = cache.get(cls)
-            print("agent-matched %s -> %s %s ($%.2f)" %
-                  (cls, entry.get("sku"), entry.get("desc") or "", entry.get("price") or 0.0))
+            print("agent-matched %s -> %s %s ($%.2f)%s" %
+                  (cls, entry.get("sku"), entry.get("desc") or "", entry.get("price") or 0.0,
+                   " [%s]" % entry["pack"] if entry.get("pack") else ""))
             return 0
         if args.candidates:
             if transport is None:

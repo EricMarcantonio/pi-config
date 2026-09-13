@@ -76,6 +76,16 @@ class TestCLI(unittest.TestCase):
         self.assertEqual(entry["sku"], "1000123456")
         self.assertEqual(entry["matched_by"], "agent")
 
+    def test_set_price_records_the_pack_size(self):
+        server = self._stub_server()
+        rc = cli_main(["--spec", self.spec_path, "--prices", self.prices, "--out", self.out,
+                       "--server", server, "--set-price", "2x4", "1000123456",
+                       "--pack", "1000 count", "--why", "the bulk stud box",
+                       "--today", "2026-09-12"])
+        self.assertEqual(rc, 0)
+        entry = json.load(open(self.prices))["items"]["2x4"]
+        self.assertEqual(entry["pack"], "1000 count")
+
     def test_candidates_mode_lists_what_needs_matching(self):
         server = self._stub_server()
         rc = cli_main(["--spec", self.spec_path, "--prices", self.prices, "--out", self.out,

@@ -53,7 +53,8 @@ not by an Ollama package. See the Notes below.
   cd ~/.pi/agent/mcp-servers/mcp_homedepot && npm install && npm run build
   ```
   Pinned to upstream commit `8ef0178`. Its tools are `hd_search`, `hd_product`, `hd_store_availability`, `hd_stores`; `HD_DEFAULT_STORE=7011` is set in `mcp.json`.
-- **Skills**: seven skills live in `skills/` and sync with this repo. Together they
+- **Skills**: seven skills from this split live in `skills/` and sync with this repo,
+  alongside two pre-existing ones. Together they
   turn a reference structure (product page, photo, drawing, CAD model) into a
   buildable wood version with a cutlist, an optimised cart and a deviations table.
   They are single-purpose by design, and a test enforces it

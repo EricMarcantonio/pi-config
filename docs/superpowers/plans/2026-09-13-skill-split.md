@@ -1029,10 +1029,124 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-Then retarget that file's paths to the new workspace convention (no new test is
-added there — see the plan's preflight rulings; the thin FreeCAD wrappers
-`wall_bounds`, `openings_from_cutters` and `check_envelope` stay covered by this
-optional end-to-end file, not by a mocked FreeCAD):
+6. The three `doc`-touching wrappers are tested too, with a stub document — no
+   FreeCAD needed, because they are duck-typed (`doc.Objects`, `doc.getObject`,
+   `obj.Name`, `obj.Shape.isNull()`, `obj.Shape.BoundBox` with
+   `XMin/XMax/YMin/YMax/ZMin/ZMax` and `XLength/ZLength/ZMax`), and a stub is the
+   real shape of the input, not a mock of the module under test. Add this to
+   `test_from_model.py`, and add `wall_bounds`, `openings_from_cutters` and
+   `check_envelope` to its imports (and drop the unused `BuildSpec` import):
+
+```python
+class StubBox:
+    def __init__(self, xmin, xmax, ymin, ymax, zmin, zmax):
+        self.XMin, self.XMax = xmin, xmax
+        self.YMin, self.YMax = ymin, ymax
+        self.ZMin, self.ZMax = zmin, zmax
+
+    @property
+    def XLength(self):
+        return self.XMax - self.XMin
+
+    @property
+    def ZLength(self):
+        return self.ZMax - self.ZMin
+
+
+class StubShape:
+    def __init__(self, box):
+        self.BoundBox = box
+
+    def isNull(self):
+        return self.BoundBox is None
+
+
+class StubObj:
+    def __init__(self, name, box):
+        self.Name = name
+        self.Shape = StubShape(box)
+
+
+class StubDoc:
+    def __init__(self, objs):
+        self.Objects = objs
+
+    def getObject(self, name):
+        return next((o for o in self.Objects if o.Name == name), None)
+
+
+class TestWallBounds(unittest.TestCase):
+    def test_wall_object_wins_over_the_naming_convention(self):
+        doc = StubDoc([StubObj("WallsOpen", StubBox(0, 10, 0, 20, 0, 30)),
+                       StubObj("panelCut", StubBox(0, 999, 0, 999, 0, 999))])
+        self.assertEqual(wall_bounds(doc, wall_object="WallsOpen"),
+                         (0, 10, 0, 20, 0, 30))
+
+    def test_naming_convention_selects_panels_and_posts(self):
+        doc = StubDoc([StubObj("sideCut", StubBox(0, 10, 0, 20, 0, 30)),
+                       StubObj("Post1", StubBox(-5, 10, 0, 20, 0, 30)),
+                       StubObj("ignored", StubBox(0, 500, 0, 500, 0, 500))])
+        self.assertEqual(wall_bounds(doc), (-5, 10, 0, 20, 0, 30))
+
+    def test_a_model_with_neither_is_refused(self):
+        with self.assertRaises(SpecError):
+            wall_bounds(StubDoc([StubObj("ignored", StubBox(0, 1, 0, 1, 0, 1))]))
+
+    def test_a_missing_named_object_is_refused(self):
+        with self.assertRaises(SpecError):
+            wall_bounds(StubDoc([]), wall_object="WallsOpen")
+
+
+class TestCutters(unittest.TestCase):
+    ENVELOPE = {"width": 2788.92, "depth": 2179.32, "height_tall": 2258.06,
+                "roof_fall": 200.0, "tall_side": "front"}
+
+    def _doc(self):
+        return StubDoc([StubObj("fw_door", StubBox(0, 1386.84, 0, 1, 0, 1811.02)),
+                        StubObj("fw_band", StubBox(0, 2698.92, 0, 1, 1878.06, 2178.06))])
+
+    def test_door_and_band_read_from_the_model(self):
+        got = openings_from_cutters(self._doc(), self.ENVELOPE, corner_width=89.0,
+                                    roof_build_up=120.0)
+        door, band = got[0], got[1]
+        self.assertEqual(door["kind"], "door")
+        self.assertAlmostEqual(door["width"], 1386.84)
+        self.assertAlmostEqual(door["height"], 1811.02)
+        self.assertAlmostEqual(band["width"], 2610.92)
+        self.assertAlmostEqual(band["sill"], 1838.06)
+
+    def test_extra_openings_are_appended_in_order(self):
+        extra = [{"wall": "left", "kind": "transom", "width": 595.0,
+                  "height": 220.0, "sill": 1511.02, "header": None}]
+        got = openings_from_cutters(self._doc(), self.ENVELOPE, corner_width=89.0,
+                                    roof_build_up=120.0, extra=extra)
+        self.assertEqual([o["kind"] for o in got], ["door", "band", "transom"])
+
+    def test_missing_cutters_are_refused(self):
+        with self.assertRaises(SpecError):
+            openings_from_cutters(StubDoc([]), self.ENVELOPE)
+
+
+class TestEnvelopeCheck(unittest.TestCase):
+    class StubSpec:
+        envelope = {"width": 2788.92, "depth": 2179.32, "height_tall": 2258.06,
+                    "roof_fall": 200.0, "tall_side": "front"}
+
+    def test_a_matching_model_passes(self):
+        doc = StubDoc([StubObj("WallsOpen",
+                               StubBox(0, 2788.92, 0, 2179.32, 0, 2178.06))])
+        check_envelope(self.StubSpec(), doc, wall_object="WallsOpen")
+
+    def test_a_moved_model_is_refused(self):
+        doc = StubDoc([StubObj("WallsOpen",
+                               StubBox(0, 2800.0, 0, 2179.32, 0, 2178.06))])
+        with self.assertRaises(SpecError):
+            check_envelope(self.StubSpec(), doc, wall_object="WallsOpen")
+```
+
+Then retarget `test_real_build.py`'s paths to the new workspace convention. That
+file gains **no** new test — it stays the optional end-to-end check, and the
+wrappers are covered by the stub tests above:
 
 ```python
 BUILD_DIR = os.path.expanduser("~/Documents/woodbuild/keter-pent97")
@@ -1204,7 +1318,7 @@ cd /Users/eric/pi-config
 python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -t skills/woodbuild-engine/scripts 2>&1 | grep -E "^(Ran|OK|FAILED)"
 ```
 
-Expected: `Ran 132 tests` (131 − 5 extractor tests + 6 new), `OK (skipped=9)`.
+Expected: `Ran 141 tests` (131 − 5 extractor tests + 15 new: 6 pure + 9 stub-doc), `OK (skipped=9)`.
 
 - [ ] **Step 6: Commit**
 
@@ -1461,7 +1575,7 @@ python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -t skills/
 grep -rln "homedepot\|hd_product\|hd_search" skills/ --include=*.py --include=*.md | sort
 ```
 
-Expected: `Ran 133 tests`, `OK (skipped=9)`. Grep lists **only** files under `skills/homedepot-catalogue/`, plus `skills/building-from-reference/SKILL.md` (deleted in Task 8).
+Expected: `Ran 142 tests`, `OK (skipped=9)`. Grep lists **only** files under `skills/homedepot-catalogue/`, plus `skills/building-from-reference/SKILL.md` (deleted in Task 8).
 
 - [ ] **Step 8: Commit**
 
@@ -2100,7 +2214,7 @@ cd /Users/eric/pi-config
 python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -t skills/woodbuild-engine/scripts 2>&1 | grep -E "^(Ran|OK|FAILED)|^(FAIL|ERROR):"
 ```
 
-Expected: `Ran 140 tests`, `OK (skipped=9)`. Any failure names the file that broke the
+Expected: `Ran 149 tests`, `OK (skipped=9)`. Any failure names the file that broke the
 split — fix that file, not the test.
 
 - [ ] **Step 3: Commit**
@@ -2180,7 +2294,7 @@ cd /Users/eric/pi-config
 python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -t skills/woodbuild-engine/scripts 2>&1 | grep -E "^(Ran|OK|FAILED)"
 ```
 
-Expected: `Ran 140 tests`, `OK (skipped=9)`.
+Expected: `Ran 149 tests`, `OK (skipped=9)`.
 
 - [ ] **Step 4: End-to-end offline run against a fresh workspace**
 

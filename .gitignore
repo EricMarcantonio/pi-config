@@ -20,3 +20,6 @@ sessions/
 mcp-servers/
 *.pre-*
 models.json.pre-*
+
+# worktrees
+.worktrees/

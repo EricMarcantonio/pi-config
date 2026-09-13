@@ -47,7 +47,7 @@ workbook subtitle.
 ## What the store actually carries
 
 See `stock-availability.md` for the availability traps and
-`substitutions-hd.md` for the material translations this store forced. The
+`substitutions-hd.md` for the material lessons this store forced. The
 headlines: no ground-contact 2x4 exists; bulk packs pay off only at the right
 size; price availability is per SKU; and search terms decide everything
 (`2x4x8 SPF stud` returns anchor bolts).

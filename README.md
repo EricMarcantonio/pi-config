@@ -83,7 +83,9 @@ not by an Ollama package. See the Notes below.
   python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests \
     -t skills/woodbuild-engine/scripts
   ```
-- **Shed build data**: the reference model and the priced build live outside this repo in `~/freecad` (the parametric model `keter_signature_pent97.py`, the generated spec, the committed price cache with agent-match provenance, and `out/budget.html`). Not versioned; re-derive with the spec extractor.
+- **Build workspaces**: a build's `spec.json`, price cache, `decisions.md` and
+  `out/` live outside this repo in `~/Documents/woodbuild/<slug>/` (the convention
+  `building-from-reference` owns). Not versioned.
 - **Ollama models**: `models.json` points at `http://127.0.0.1:11434/v1` with `apiKey: "ollama"`. Change `baseUrl` if your Ollama isn't local. All model ids use the `:cloud` suffix.
 - **Costs** are USD per 1M tokens, off-peak rates only (pi has no time-of-day pricing; Ollama peak, Mon–Fri 12–18 UTC, is ~2×).
 - **Context windows** come from `ollama show <model>`.

@@ -17,7 +17,8 @@ and part ids that carry their wall.
 
 ```bash
 cd <workspace>
-python3 ../woodbuild-engine/scripts/woodbuild.py --spec spec.json --prices prices.json \
+E=<repo>/skills/woodbuild-engine/scripts
+python3 $E/woodbuild.py --spec spec.json --prices prices.json \
   --out out            # --adapter ... for live prices; not needed to see framing
 ```
 

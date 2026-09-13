@@ -79,6 +79,21 @@ class TestBom(unittest.TestCase):
         adhesive = [c for c in cons if c.stock == "adhesive"][0]
         self.assertEqual(adhesive.uom, "ml")
 
+    def test_screws_are_derived_from_connections(self):
+        parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]
+        cons = consumables({"options": {}}, parts)
+        screws = [c for c in cons if c.stock == "screws_3in"][0]
+        self.assertEqual(screws.uom, "each")
+        self.assertEqual(screws.qty, 66)
+        self.assertIn("board", screws.note)
+
+    def test_screws_scale_with_parts_not_length(self):
+        short = [Part(id="s", w=100.0, h=89.0, qty=10, stock="2x4")]
+        long_ = [Part(id="s", w=4000.0, h=89.0, qty=10, stock="2x4")]
+        a = [c for c in consumables({}, short) if c.stock == "screws_3in"][0].qty
+        b = [c for c in consumables({}, long_) if c.stock == "screws_3in"][0].qty
+        self.assertEqual(a, b)          # connections, not millimetres
+
     def test_pack_size_converts_pieces_to_packs(self):
         parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]
         prices = {"screws_3in": {"price": 23.98, "sku": "1", "matched_by": "agent",

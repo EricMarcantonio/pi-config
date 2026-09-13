@@ -7,7 +7,6 @@ import os
 
 from . import bom, stock
 from .bom import totals, unpriced
-from .pricing import tax_rate_for
 
 CSS = """
 body{background:#15161a;color:#e8e6e3;font:14px/1.5 -apple-system,Segoe UI,Roboto,sans-serif;margin:24px}
@@ -58,26 +57,27 @@ def _num(v, dash="unpriced"):
     return dash if v is None else "%.2f" % v
 
 
-def _provenance(line, cache):
+def _provenance(line, cache, adapter=None):
     """What backs a line's price: an agent match, a raw candidate, or nothing.
 
     Returns (label, warn). The cache entry is authoritative: a line built from
-    an agent-matched class is labelled 'agent' even if the line carries a
-    search source, and an old hd_search entry with no matched_by is a candidate
-    that still needs verifying.
+    an agent-matched class is labelled 'agent' even if the line carries a search
+    source, and a search entry with no matched_by is a candidate that still
+    needs verifying. Which labels mean 'candidate' is the adapter's business.
     """
     entry = cache.get(line.stock) if cache is not None else None
     if entry and entry.get("matched_by") == "agent":
         return "agent", False
-    if line.source == "hd_search":
+    if adapter is not None and adapter.is_candidate(line.source):
         return "candidate - verify", True
     if line.unit_price is None:
         return "unpriced", True
     return (line.source or "-"), False
 
 
-def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None):
-    t = totals(lines, tax_rate_for(cache.province or "ON"))
+def render_html(spec, parts, sheet_plans, board_plans, lines, cache, adapter=None,
+                tax_rate=0.0, today=None):
+    t = totals(lines, tax_rate)
     rows = cutlist_rows(parts, sheet_plans, board_plans)
     e = html_mod.escape
 
@@ -86,14 +86,13 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
            "<style>%s</style>" % CSS,
            "<h1>%s</h1>" % e(spec.data.get("build", "build")),
            "<p class=sub>store %s &middot; %s &middot; price cache %s &middot; "
-           "HST %.1f%% &middot; generated %s</p>"
+           "tax %.1f%% &middot; generated %s</p>"
            % (e(str(cache.store)), e(str(cache.data.get("storeName") or "")),
-              e(str(cache.fetched)), tax_rate_for(cache.province or "ON") * 100,
-              e(today or ""))]
+              e(str(cache.fetched)), tax_rate * 100, e(today or ""))]
 
     out.append("<div class=cards>")
     for label, value in (("subtotal", "$%.2f" % t["subtotal"]),
-                         ("HST", "$%.2f" % t["tax"]),
+                         ("tax", "$%.2f" % t["tax"]),
                          ("total", "$%.2f" % t["total"]),
                          ("lines", str(t["lines"])),
                          ("unpriced", str(t["unpriced"]))):
@@ -159,9 +158,9 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
                        "<th class=num>Line</th><th>Source</th></tr>")
         cls_attr = "" if line.unit_price is not None else " class=unpriced"
         desc = e(line.description)
-        if line.source == "hd_search":
+        if adapter is not None and adapter.is_candidate(line.source):
             desc += " <span class=warn>matched by description - verify SKU</span>"
-        prov, warn = _provenance(line, cache)
+        prov, warn = _provenance(line, cache, adapter)
         prov_html = ("<span class=warn>%s</span>" % e(prov)) if warn else e(prov)
         out.append("<tr%s><td>%s</td><td>%s</td><td class=num>%g %s</td>"
                    "<td class=num>%s</td><td class=num>%s</td><td>%s</td></tr>"
@@ -198,7 +197,7 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
 
 
 def write_report(spec, parts, sheet_plans, board_plans, lines, cache, out_dir,
-                 today=None):
+                 adapter=None, tax_rate=0.0, today=None):
     if not os.path.isdir(out_dir):
         os.makedirs(out_dir)
     paths = {"html": os.path.join(out_dir, "budget.html"),
@@ -207,7 +206,8 @@ def write_report(spec, parts, sheet_plans, board_plans, lines, cache, out_dir,
              "sku_qty": os.path.join(out_dir, "sku-qty.txt")}
 
     with open(paths["html"], "w") as fh:
-        fh.write(render_html(spec, parts, sheet_plans, board_plans, lines, cache, today))
+        fh.write(render_html(spec, parts, sheet_plans, board_plans, lines, cache,
+                             adapter, tax_rate, today))
 
     rows = cutlist_rows(parts, sheet_plans, board_plans)
     with open(paths["cutlist"], "w", newline="") as fh:

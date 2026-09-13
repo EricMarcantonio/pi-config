@@ -29,7 +29,7 @@ class TestBom(unittest.TestCase):
 
     def test_prices_attach_by_stock_class(self):
         plans = [SheetPlan(stock="osb_7_16", sheets=[[], []])]
-        prices = {"osb_7_16": {"price": 28.98, "sku": "123", "source": "hd_product",
+        prices = {"osb_7_16": {"price": 28.98, "sku": "123", "source": "product",
                                "desc": '7/16" OSB'}}
         line = build_bom([], plans, [], prices=prices)[0]
         self.assertAlmostEqual(line.unit_price, 28.98)
@@ -63,12 +63,12 @@ class TestBom(unittest.TestCase):
     def test_consumables_take_prices_from_the_cache_by_class(self):
         parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]
         prices = {"screws_3in": {"price": 12.5, "sku": "555",
-                                 "source": "hd_search"}}
+                                 "source": "search"}}
         cons = consumables({"options": {}}, parts, prices=prices)
         screws = [c for c in cons if c.stock == "screws_3in"][0]
         self.assertEqual(screws.unit_price, 12.5)
         self.assertEqual(screws.sku, "555")
-        self.assertEqual(screws.source, "hd_search")
+        self.assertEqual(screws.source, "search")
 
     def test_consumables_are_physical_amounts(self):
         parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]

@@ -47,6 +47,12 @@ not by an Ollama package. See the Notes below.
 
 ## Notes
 
+- **Home Depot MCP**: `mcp.json` points at `mcp-servers/mcp_homedepot/dist/index.js`, which is a machine-local clone and is gitignored. To restore on a new machine:
+  ```bash
+  git clone https://github.com/sstepanovvl/mcp_homedepot.git ~/.pi/agent/mcp-servers/mcp_homedepot
+  cd ~/.pi/agent/mcp-servers/mcp_homedepot && npm install && npm run build
+  ```
+  Pinned to upstream commit `8ef0178`. Its tools are `hd_search`, `hd_product`, `hd_store_availability`, `hd_stores`; `HD_DEFAULT_STORE=7011` is set in `mcp.json`.
 - **Skills**: three skills live in `skills/` and sync with this repo. `building-from-reference` turns a reference structure (product page, photo, drawing, CAD model) into a buildable wood version with a cutlist, an optimised Home Depot cart and a deviations table; it carries the stdlib-only `woodbuild` engine (own test suite: `python3 -m unittest discover -s skills/building-from-reference/scripts/tests -v`). `freecad-render-views` covers FreeCAD 1.1's view API limits (per-document ActiveView, read-only viewPosition, late/stale captures, TechDraw pages breaking the MCP screenshot path). `freecad-model-hygiene` covers disjoint-part modelling, the silent boolean failures, and the DAG-root overlap audit.
 - **Shed build data**: the reference model and the priced build live outside this repo in `~/freecad` (the parametric model `keter_signature_pent97.py`, the generated spec, the committed price cache with agent-match provenance, and `out/budget.html`). Not versioned; re-derive with the spec extractor.
 - **Ollama models**: `models.json` points at `http://127.0.0.1:11434/v1` with `apiKey: "ollama"`. Change `baseUrl` if your Ollama isn't local. All model ids use the `:cloud` suffix.

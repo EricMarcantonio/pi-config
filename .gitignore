@@ -15,3 +15,8 @@ sessions/
 
 # local backups
 *.bak
+
+# machine-local checkouts and backups
+mcp-servers/
+*.pre-*
+models.json.pre-*

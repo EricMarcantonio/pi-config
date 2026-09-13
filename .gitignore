@@ -23,3 +23,6 @@ models.json.pre-*
 
 # worktrees
 .worktrees/
+
+# subagent-driven-development scratch
+.superpowers/

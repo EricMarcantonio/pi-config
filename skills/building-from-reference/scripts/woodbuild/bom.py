@@ -12,8 +12,7 @@ from . import stock
 # options map (same name, lower case); the values here are the defaults. They
 # are printed in the workbook methodology so a reader can audit the arithmetic.
 # ---------------------------------------------------------------------------
-SCREW_CONNECTION_SPACING_MM = 300.0   # one connection point every 300 mm of framing
-SCREWS_PER_CONNECTION = 3             # a structural connection takes three screws
+SCREWS_PER_BOARD_END = 3              # each board end lands on 2-3 screws
 SHEATHING_FASTENER_EDGE_MM = 150.0    # sheathing nails on panel edges
 SHEATHING_FASTENER_FIELD_MM = 300.0   # sheathing nails in the panel field
 ADHESIVE_ML_PER_M_JOINT = 295.0 / 7.0  # a 295 ml cartridge lays ~7 m of bead
@@ -158,26 +157,25 @@ def consumables(spec, parts, prices=None):
     callers that ask for it can see the matched price; it is not a usable line
     total until `build_bom` has made the units agree.
     """
-    framing_mm = 0.0
+    board_parts = 0.0
     panel_perimeter_mm = 0.0
     for p in parts:
         if p.stock in stock.BOARDS:
-            framing_mm += p.w * p.qty
+            board_parts += p.qty
         if p.id.startswith(("sheathing_", "deck", "roof_deck")):
             panel_perimeter_mm += 2 * (p.w + p.h) * p.qty
     # A butt seam between two panels appears in both panels' perimeters, so the
     # unique linear joint length is about half the summed perimeter.
     joint_mm = panel_perimeter_mm / 2.0
 
-    spacing = _option(spec, "screw_connection_spacing_mm", SCREW_CONNECTION_SPACING_MM)
-    per_conn = _option(spec, "screws_per_connection", SCREWS_PER_CONNECTION)
+    per_end = _option(spec, "screws_per_board_end", SCREWS_PER_BOARD_END)
     edge = _option(spec, "sheathing_fastener_edge_mm", SHEATHING_FASTENER_EDGE_MM)
     field = _option(spec, "sheathing_fastener_field_mm", SHEATHING_FASTENER_FIELD_MM)
     adh = _option(spec, "adhesive_ml_per_m_joint", ADHESIVE_ML_PER_M_JOINT)
     seal = _option(spec, "sealant_ml_per_m_joint", SEALANT_ML_PER_M_JOINT)
     overbuy = _option(spec, "consumable_overbuy", CONSUMABLE_OVERBUY)
 
-    screws = int(math.ceil(framing_mm / spacing * per_conn * overbuy))
+    screws = int(math.ceil(per_end * 2 * board_parts * overbuy))
     nails = int(math.ceil((panel_perimeter_mm / edge + panel_perimeter_mm / field)
                           * overbuy))
     adhesive_ml = int(math.ceil(joint_mm / 1000.0 * adh * overbuy))
@@ -187,8 +185,8 @@ def consumables(spec, parts, prices=None):
     out = [
         BomLine("fasteners", "screws_3in", '3" exterior structural screws',
                 screws, "each", None, None, None,
-                "%d screws from %.1f m of framing at %g per %g mm (incl. %d%% waste)"
-                % (screws, framing_mm / 1000.0, per_conn, spacing, waste)),
+                "%d screws: %g per board end x 2 ends x %g board parts, "
+                "+%d%% overbuy" % (screws, per_end, board_parts, waste)),
         BomLine("fasteners", "nails_8d", "8d galvanised sheathing nails",
                 nails, "each", None, None, None,
                 "%d nails from %.1f m of panel perimeter at %g/%g mm o.c. "

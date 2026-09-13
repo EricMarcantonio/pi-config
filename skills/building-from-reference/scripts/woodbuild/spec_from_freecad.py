@@ -10,7 +10,7 @@ import os
 import sys
 
 from .bom import (ADHESIVE_ML_PER_M_JOINT, CONSUMABLE_OVERBUY,
-                  SCREW_CONNECTION_SPACING_MM, SCREWS_PER_CONNECTION,
+                  SCREWS_PER_BOARD_END,
                   SEALANT_ML_PER_M_JOINT, SHEATHING_FASTENER_EDGE_MM,
                   SHEATHING_FASTENER_FIELD_MM)
 from .spec import BuildSpec, SpecError
@@ -145,8 +145,7 @@ def spec_skeleton(envelope):
             "hasp": "hasp and staple lock",
             "gravel": "crushed gravel 3/4 inch"}},
         "options": {"kerf": 3.0, "retain_offcut_min": 300.0,
-                    "screw_connection_spacing_mm": SCREW_CONNECTION_SPACING_MM,
-                    "screws_per_connection": SCREWS_PER_CONNECTION,
+                    "screws_per_board_end": SCREWS_PER_BOARD_END,
                     "sheathing_fastener_edge_mm": SHEATHING_FASTENER_EDGE_MM,
                     "sheathing_fastener_field_mm": SHEATHING_FASTENER_FIELD_MM,
                     "adhesive_ml_per_m_joint": ADHESIVE_ML_PER_M_JOINT,

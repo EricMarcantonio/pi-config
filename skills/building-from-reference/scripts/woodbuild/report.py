@@ -183,7 +183,7 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
     out.append("<h2>Methodology</h2><p class=sub>Dimensions in mm; stock is imperial. "
                "Kerf %.1f mm. Parts are placed by shelf packing; grain-locked parts "
                "are never rotated. Consumables are derived from geometry and carry an "
-               "explicit %.0f%% waste factor: screws at %g per %g mm of framing, "
+               "explicit %.0f%% waste factor: screws at %g per board end, "
                "sheathing nails at %g/%g mm o.c., adhesive at ~7 m per 295 ml "
                "cartridge, sealant at ~10 m per 300 ml cartridge. Pieces and "
                "millilitres are converted to packs only when the agent match records "
@@ -191,7 +191,7 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
                "the committed cache; a fetch refreshes only missing or stale "
                "classes. %d substitutions recorded, %d of them change the diagram.</p>"
                % (stock.KERF, (bom.CONSUMABLE_OVERBUY - 1) * 100,
-                  bom.SCREWS_PER_CONNECTION, bom.SCREW_CONNECTION_SPACING_MM,
+                  bom.SCREWS_PER_BOARD_END,
                   bom.SHEATHING_FASTENER_EDGE_MM, bom.SHEATHING_FASTENER_FIELD_MM,
                   len(sub), sum(1 for s in sub if s.get("changes_diagram"))))
     return "\n".join(out)

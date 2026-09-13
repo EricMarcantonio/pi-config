@@ -8,8 +8,7 @@ import subprocess
 import threading
 from datetime import date
 
-TAX_RATES = {"ON": 0.13, "AB": 0.05, "BC": 0.12, "QC": 0.14975,
-             "MB": 0.12, "SK": 0.11, "NS": 0.15, "NB": 0.15, "NL": 0.15, "PE": 0.15}
+from .adapters import NullAdapter
 
 # An agent match older than this must be re-judged, not silently trusted.
 MATCH_MAX_AGE_DAYS = 30
@@ -21,10 +20,6 @@ class PriceError(Exception):
 
 class PricingTransportError(Exception):
     """The MCP server could not answer a price lookup."""
-
-
-def tax_rate_for(province):
-    return TAX_RATES.get(province, 0.13)
 
 
 class PriceCache:
@@ -80,7 +75,7 @@ class PriceCache:
 
 
 class StdioMCP:
-    """Minimal MCP stdio client: enough for tools/call on the Home Depot server.
+    """Minimal MCP stdio client: enough for tools/call on a store MCP server.
 
     Responses are matched by id, because a server notification arriving between
     request and reply is not the reply. stderr is drained on a thread so a chatty
@@ -175,12 +170,13 @@ class StdioMCP:
                 pass
 
 
-def put_matched(cache, cls, entry, why, today=None, pack=None):
+def put_matched(cache, cls, entry, why, today=None, pack=None, source="product"):
     """Record an agent's match. Requires a sku; stamps provenance.
 
     `pack` is the pack size the price is for, e.g. "50 count" or "295 ml". It
     travels with the match because a per-pack price may only price a pack, never
     a count of pieces. A missing pack is honestly "unknown", never guessed.
+    `source` is the label the adapter calls a verified product.
     """
     if not entry or not entry.get("sku"):
         raise ValueError("an agent match needs a sku for class %r" % (cls,))
@@ -189,7 +185,7 @@ def put_matched(cache, cls, entry, why, today=None, pack=None):
     rec["matched_by"] = "agent"
     rec["matched_on"] = today
     rec["why"] = why
-    rec.setdefault("source", "hd_product")
+    rec.setdefault("source", source)
     rec.setdefault("fetched", today)
     if pack:
         rec["pack"] = pack
@@ -217,23 +213,27 @@ def needs_match(spec, cache, days=MATCH_MAX_AGE_DAYS, today=None):
     return out
 
 
-def candidates(spec, transport, classes=None):
-    """{class: [{sku, name, price, url}]} from hd_search, for the agent to read.
+def _adapter(adapter):
+    return adapter if adapter is not None else NullAdapter()
+
+
+def candidates(spec, transport, adapter=None, classes=None):
+    """{class: [{sku, name, price, url}]} from the adapter's search tool.
 
     A search hit is a candidate, never a price: this never touches the cache.
     """
+    adapter = _adapter(adapter)
     terms = spec.search_terms()
     chosen = sorted(terms) if classes is None else list(classes)
-    store = spec.data.get("pricing", {}).get("store") or "9999"
+    store = spec.data.get("pricing", {}).get("store") or adapter.default_store
     out = {}
     for cls in chosen:
         query = terms.get(cls)
-        if not query:
+        if not query or not adapter.search_tool:
             continue
         try:
-            payload = transport.call("hd_search", {"query": query,
-                                                     "storeId": store,
-                                                     "pageSize": 5})
+            payload = transport.call(adapter.search_tool,
+                                     {"query": query, "storeId": store, "pageSize": 5})
         except PricingTransportError:
             out[cls] = []
             continue
@@ -244,35 +244,41 @@ def candidates(spec, transport, classes=None):
     return out
 
 
-def set_price(cache, cls, sku, why, transport, store=None, today=None, pack=None):
-    """Verify the SKU with hd_product, then record name/url/price + provenance.
+def set_price(cache, cls, sku, why, transport, adapter=None, store=None, today=None,
+              pack=None):
+    """Verify the SKU with the adapter's product tool, then record the match.
 
     `store` must come from the spec: a cache that has never been written has no
-    store of its own, and querying the national store (9999) would record a price
-    that later gets labelled with the spec's store.
+    store of its own, and querying a national id would record a price that later
+    gets labelled with the spec's store.
     """
+    adapter = _adapter(adapter)
     today = today or date.today().isoformat()
-    store_id = str(store or cache.store or "")
+    store_id = str(store or cache.store or adapter.default_store or "")
     if not store_id:
         raise PriceError("set_price needs a store: pass the spec's store")
-    payload = transport.call("hd_product", {"sku": sku, "storeId": store_id})
+    payload = transport.call(adapter.product_tool, {"sku": sku, "storeId": store_id})
     if not payload or payload.get("price") is None:
-        raise PricingTransportError("hd_product returned no price for sku %s" % sku)
+        raise PricingTransportError("%s returned no price for sku %s"
+                                    % (adapter.product_tool, sku))
     entry = {"sku": sku, "desc": payload.get("name"),
              "price": float(payload["price"]), "url": payload.get("url"),
-             "source": "hd_product", "fetched": today}
-    return put_matched(cache, cls, entry, why, today=today, pack=pack)
+             "source": adapter.source_product, "fetched": today}
+    return put_matched(cache, cls, entry, why, today=today, pack=pack,
+                       source=adapter.source_product)
 
 
-def resolve(spec, cache, transport=None, refresh=False, today=None):
+def resolve(spec, cache, transport=None, adapter=None, refresh=False, today=None):
     """Return {stock class: price entry} for agent-matched classes only.
 
     A script may never accept a search hit as a price: an unmatched class stays
     `unpriced` with reason 'not agent-matched'. With a transport, refresh
-    re-verifies the price of an already-matched sku via hd_product; a stale
-    match is a re-matching prompt, never silent trust. A cache priced for a
-    different store than the spec is a hard error.
+    re-verifies the price of an already-matched sku; a stale match is a
+    re-matching prompt, never silent trust. A cache priced for a different store
+    than the spec is a hard error. With no store id anywhere, a stale class is
+    marked unpriced rather than queried against a guessed store.
     """
+    adapter = _adapter(adapter)
     today = today or date.today().isoformat()
     cache.load()                 # a cache handed in cold reads its file first
     want_store = spec.data.get("pricing", {}).get("store")
@@ -297,21 +303,26 @@ def resolve(spec, cache, transport=None, refresh=False, today=None):
             cache.mark_unpriced(cls, "not agent-matched", [])
             continue
         if refresh and transport is not None and cache.is_stale(cls, days=7, today=today):
+            store_id = str(cache.store or "")
+            if not store_id:
+                cache.mark_unpriced(cls, "no store configured for a refresh", [])
+                continue
             try:
-                payload = transport.call("hd_product", {"sku": entry["sku"],
-                                                         "storeId": cache.store or "9999"})
+                payload = transport.call(adapter.product_tool,
+                                         {"sku": entry["sku"], "storeId": store_id})
             except PricingTransportError as exc:
-                cache.mark_unpriced(cls, "transport error: %s" % exc, ["hd_product"])
+                cache.mark_unpriced(cls, "transport error: %s" % exc,
+                                    [adapter.product_tool])
                 continue
             price = (payload or {}).get("price")
             if price is None:
-                cache.mark_unpriced(cls, "null price returned", ["hd_product"])
+                cache.mark_unpriced(cls, "null price returned", [adapter.product_tool])
                 continue
             entry = dict(entry)
             entry.update({"price": float(price),
                           "desc": payload.get("name", entry.get("desc")),
                           "url": payload.get("url", entry.get("url")),
-                          "source": "hd_product", "fetched": today})
+                          "source": adapter.source_product, "fetched": today})
             cache.put(cls, entry)
         unpriced.pop(cls, None)
         result[cls] = entry

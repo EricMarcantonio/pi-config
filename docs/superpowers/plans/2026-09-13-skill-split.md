@@ -1724,10 +1724,14 @@ Ask for a project slug — never guess one — and create:
 ├── spec.json        envelope (the fixed thing), wall/roof/floor build-ups,
 │                    openings, substitutions, pricing.store/province/search, options
 ├── prices.json      the price cache
-├── candidates.json  written by the candidate pass, read by you
 ├── decisions.md     prose: why these invariants are what they are
-└── out/             budget.html, cutlist.csv, cart.csv, sku-qty.txt, price-deltas.txt
+└── out/             budget.html, cutlist.csv, cart.csv, sku-qty.txt,
+                     candidates.json (written by the candidate pass, read by you),
+                     price-deltas.txt (only with --compare)
 ```
+
+The CLI writes everything it produces under `--out`; that is why `candidates.json`
+lives there and not beside `spec.json`.
 
 ## Workflow
 
@@ -1760,7 +1764,7 @@ Ask for a project slug — never guess one — and create:
 
 ```bash
 cd ~/Documents/woodbuild/<slug>
-E=../woodbuild-engine/scripts   # or the absolute path to this repo's skills/ dir
+E=../woodbuild-engine/scripts   # absolute: <repo>/skills/woodbuild-engine/scripts
 python3 $E/woodbuild.py --spec spec.json --prices prices.json --out out
 python3 $E/woodbuild.py --spec spec.json --prices prices.json --out out --candidates \
   --adapter <repo>/skills/homedepot-catalogue/scripts/homedepot_adapter.py

@@ -148,10 +148,13 @@ never guesses one, and creates:
 │                    openings, substitutions, pricing.store, pricing.province,
 │                    pricing.search, options
 ├── prices.json      the price cache
-├── candidates.json  written by the candidate pass, read by the agent
 ├── decisions.md     prose: why these invariants are what they are
-└── out/             budget.html, cutlist.csv, cart.csv, sku-qty.txt, price-deltas.txt
+└── out/             budget.html, cutlist.csv, cart.csv, sku-qty.txt, candidates.json
+                     (written by the candidate pass, read by the agent), price-deltas.txt
 ```
+
+The CLI writes everything it produces under `--out`, so `candidates.json` sits there
+beside the workbook rather than beside `spec.json`.
 
 Root `~/Documents/woodbuild/` is overridable with a flag. Invariants are machine-
 checked where they can be (`spec.envelope` is already the fixed thing, and

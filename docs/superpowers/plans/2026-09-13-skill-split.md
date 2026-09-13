@@ -1959,6 +1959,33 @@ package. Do not split the tree across packages.
 | module | responsibility |
 |---|---|
 | `stock.py` | stock geometry: sheet sizes, board sections, sale lengths, kerf. No availability |
+
+## Stock geometry
+
+Moved here from the old `stock-catalogue.md` as that file is deleted: this is the
+engine's own vocabulary, not a store's availability (that is
+`homedepot-catalogue/stock-availability.md`). Sizes are millimetres; the names are
+imperial because that is what a builder asks for at the saw.
+
+| class | size | thick | grain | category |
+|---|---|---|---|---|
+| `osb_7_16` | 1219 × 2438 | 11 | – | sheets |
+| `plywood_tg_18` | 1219 × 2438 | 18 | deck | sheets |
+| `plywood_ext_18` | 1219 × 2438 | 18 | face | sheets |
+| `smartside_grooved` | 1219 × 2438 | 11 | groove | sheets |
+| `polycarbonate_6` | 610 × 1220 | 6 | – | glazing |
+
+| class | section | sale lengths | category |
+|---|---|---|---|
+| `2x4` | 38 × 89 | 8 / 10 / 12 / 16 ft | lumber |
+| `2x6` | 38 × 140 | 8 / 10 / 12 / 16 ft | lumber |
+| `2x8` | 38 × 184 | 8 / 10 / 12 / 16 ft | lumber |
+| `pt_2x4` | 38 × 89 | 8 / 10 / 12 / 16 ft | lumber |
+| `pt_4x4` | 89 × 89 | 8 / 10 / 12 ft | base |
+
+Optimiser constants: **kerf 3.0 mm** between adjacent parts and at board cut ends;
+**offcuts ≥ 300 mm** reported as reusable. The rules that use them are in
+`sheet-and-board-nesting`.
 | `spec.py` | the spec dataclass, derived dimensions, `validate()` |
 | `frame.py` | framing derivation (the rules are in `wood-framing`) |
 | `optimise.py` | sheet nesting and board cutting-stock |
@@ -2045,7 +2072,10 @@ after the "Translate" step's paragraph:
 ```
 
 Delete what remains of the old skill (each path separately: one missing file must
-not silently cancel the whole deletion):
+not silently cancel the whole deletion). Before deleting `stock-catalogue.md`, confirm
+its geometry tables now exist in `woodbuild-engine/SKILL.md`'s "Stock geometry"
+section (they are the engine's vocabulary) and its optimiser constants exist in
+`sheet-and-board-nesting/SKILL.md`:
 
 ```bash
 cd /Users/eric/pi-config

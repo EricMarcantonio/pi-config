@@ -60,6 +60,23 @@ not by an Ollama package. See the Notes below.
 - **Context windows** come from `ollama show <model>`.
 - **Web tools**: `@blazer2k/searxng-suite` provides `web_search` and `web_extract`, backed by a local SearXNG instance. `SEARXNG_URL` is set to `http://localhost:8080` in `~/.zshrc` (Docker setup lives in `~/searxng`). Ollama is used only for reasoning; the former `@ollama/pi-web-search` package is intentionally not used.
 - **Vision / image input**: pi only forwards image attachments to models whose `models.json` entry lists `"input": ["text", "image"]`. Without it the model silently receives text only. Verified by an image probe (prompt tokens 31 → 340 when an image is attached): image-capable are `deepseek-v4.1-flash:cloud` and `kimi-k3:cloud`; `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud` reject images with HTTP 400. Regenerating `models.json` can drop the `input` field, so re-add it if attachments stop reaching the model.
-- **MCP servers**: `mcp.json` configures MCP servers for `npm:pi-mcp-extension` (global scope, applies to all projects). Currently one stdio server: `freecad` (`uvx freecad-mcp`), which bridges to a running FreeCAD instance over its RPC socket (default port 9875). Tools register as `mcp_freecad_*`; inspect with `/mcp`.
+- **MCP servers**: `mcp.json` configures MCP servers for `npm:pi-mcp-extension` (global scope, applies to all projects). Two stdio servers: `freecad` (`uvx freecad-mcp`) and `homedepot`. `freecad` bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp_freecad_*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp`.
+- **MCP config path gotcha**: `pi-mcp-extension` hardcodes its global config path as `~/.pi/agent/mcp.json`; it does **not** honour `PI_CODING_AGENT_DIR`. Since this config dir is `~/pi-config`, that path is a symlink into this repo:
+  ```bash
+  ln -sfn ~/pi-config/mcp.json ~/.pi/agent/mcp.json
+  ```
+  Restore it on any machine using option B, or MCP servers silently do not load.
+- **FreeCAD MCP install** (two halves — MCP server + in-FreeCAD addon):
+  ```bash
+  brew install uv                       # provides uvx; freecad-mcp is fetched on demand
+  git clone --depth 1 https://github.com/neka-nat/freecad-mcp.git /tmp/fc-mcp-src
+  mkdir -p ~/Library/Application\ Support/FreeCAD/v1-1/Mod
+  cp -r /tmp/fc-mcp-src/addon/FreeCADMCP ~/Library/Application\ Support/FreeCAD/v1-1/Mod/
+  ```
+  Then restart FreeCAD. The RPC server also needs to be running: either pick the **MCP Addon** workbench and click **Start RPC Server**, or pre-seed auto-start by writing `~/Library/Application Support/FreeCAD/v1-1/freecad_mcp_settings.json`:
+  ```json
+  { "remote_enabled": false, "allowed_ips": "127.0.0.1", "auto_start_rpc": true }
+  ```
+  FreeCAD 1.1 user dir is `.../FreeCAD/v1-1/` (1.0 uses `v1-0/`). Launching FreeCAD via `open -a FreeCAD` right after adding the addon did not bring the RPC port up; launching the binary directly did, and later launches were fine. Verify with `nc -z 127.0.0.1 9875`.
 - **No secrets** are stored here (`apiKey` is the literal `"ollama"`).
 - **Wordy footer**: `extensions/wordy-footer.ts` replaces pi's symbol footer (`↑ ↓ R W CH`) with words (`input`, `output`, `cache-read`, `cache-hit`, `cost`, `context`). Toggle at runtime with `/footer-words`; the choice is saved to `settings.json` as `"wordyFooter"`, so it syncs across machines. Delete the extension file to restore the default footer permanently.

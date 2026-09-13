@@ -177,13 +177,16 @@ restate the framing or pricing policy that lives in the visible skills.
 
 `tests/test_boundaries.py` walks `skills/` and asserts:
 
-1. No directory except `homedepot-catalogue/` contains a store name (`homedepot`,
-   `hd_search`, `hd_product`, `HD_DEFAULT_STORE`, `MicroPro`) in any `.py` or `.md` —
+1. No directory except `homedepot-catalogue/` contains the store's identity
+   (`Home Depot`, `homedepot.ca`, `homedepot.com`, `hd_search`, `hd_product`,
+   `HD_DEFAULT_STORE`, `MicroPro`) in any `.py` or `.md` —
    **including `tests/`**, so engine tests use neutral source labels (`search`,
    `product`) and legacy labels are recognised only through
-   `adapter.candidate_sources`. The guard itself and the engine test that verifies
-   the shipped adapter are the only two exempt files, and a test asserts exactly
-   that.
+   `adapter.candidate_sources`. The bare skill slug `homedepot-catalogue` is
+   deliberately **not** banned: it is the path to the adapter, and every visible
+   skill must be able to name the file it passes to `--adapter`. The guard itself
+   and the engine test that verifies the shipped adapter are the only two exempt
+   files, and a test asserts exactly that.
 2. `woodbuild/` contains no tax numbers (`TAX_RATES`, province rate literals).
 3. Every directory with a `SKILL.md` has a `description` and a `name` matching its
    directory name.

@@ -237,11 +237,18 @@ def candidates(spec, transport, classes=None):
     return out
 
 
-def set_price(cache, cls, sku, why, transport, today=None):
-    """Verify the SKU with hd_product, then record name/url/price + provenance."""
+def set_price(cache, cls, sku, why, transport, store=None, today=None):
+    """Verify the SKU with hd_product, then record name/url/price + provenance.
+
+    `store` must come from the spec: a cache that has never been written has no
+    store of its own, and querying the national store (9999) would record a price
+    that later gets labelled with the spec's store.
+    """
     today = today or date.today().isoformat()
-    payload = transport.call("hd_product", {"sku": sku,
-                                             "storeId": cache.store or "9999"})
+    store_id = str(store or cache.store or "")
+    if not store_id:
+        raise PriceError("set_price needs a store: pass the spec's store")
+    payload = transport.call("hd_product", {"sku": sku, "storeId": store_id})
     if not payload or payload.get("price") is None:
         raise PricingTransportError("hd_product returned no price for sku %s" % sku)
     entry = {"sku": sku, "desc": payload.get("name"),

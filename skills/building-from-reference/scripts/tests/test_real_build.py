@@ -1,10 +1,9 @@
 # tests/test_real_build.py
 """End-to-end checks on the real shed build. Skips if the build data is absent."""
-import json
 import os
 import unittest
 
-from woodbuild import bom, frame, optimise, stock
+from woodbuild import bom, frame, optimise, pricing, stock
 from woodbuild.spec import BuildSpec
 
 BUILD_DIR = os.path.expanduser("~/freecad/keter_pent97_build")
@@ -21,7 +20,9 @@ class TestRealBuild(unittest.TestCase):
         cls.parts = frame.derive(cls.spec)
         prices = {}
         if os.path.exists(PRICES):
-            prices = json.load(open(PRICES)).get("items", {})
+            # price through the real pipeline: resolve() only prices
+            # agent-matched classes, so a raw items dict would bypass the policy
+            prices = pricing.resolve(cls.spec, pricing.PriceCache(PRICES), transport=None)
         # each optimiser rejects foreign stock classes, so partition as the CLI does
         sheet_parts = [p for p in cls.parts if stock.is_sheet(p.stock)]
         board_parts = [p for p in cls.parts if not stock.is_sheet(p.stock)]

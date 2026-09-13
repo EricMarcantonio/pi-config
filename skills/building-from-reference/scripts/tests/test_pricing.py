@@ -222,6 +222,33 @@ class TestAgentMatchedPricing(unittest.TestCase):
         self.assertEqual(entry["why"], "the 8 ft SPF stud")
         self.assertEqual(entry["price"], 4.25)
 
+    def test_set_price_uses_the_spec_store_on_a_storeless_cache(self):
+        # a fresh cache has no store; hd_product must be queried for the spec's
+        # store, never the national 9999, or a national price gets mislabelled.
+        cache = PriceCache(tmp_path())
+        cache.data = {"items": {}, "unpriced": {}}          # no store field at all
+        calls = []
+
+        class RecordingT:
+            def call(self, tool, arguments):
+                calls.append((tool, arguments))
+                return {"name": "2x4x8 SPF Stud", "price": 4.25,
+                        "url": "https://example/1000123456"}
+
+        set_price(cache, "2x4", "1000123456", "the stud", RecordingT(),
+                  store="7011", today="2026-09-12")
+        self.assertEqual(calls[0][1]["storeId"], "7011")
+        self.assertEqual(cache.get("2x4")["price"], 4.25)
+
+        class NeverCalledT:
+            def call(self, tool, arguments):
+                raise AssertionError("must not query without a store")
+
+        storeless = PriceCache(tmp_path())
+        storeless.data = {"items": {}, "unpriced": {}}
+        with self.assertRaises(PriceError):
+            set_price(storeless, "2x4", "1000123456", "x", NeverCalledT())
+
     def test_put_matched_refuses_an_entry_without_a_sku(self):
         cache = PriceCache(tmp_path())
         cache.data = {"items": {}, "unpriced": {}}

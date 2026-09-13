@@ -227,6 +227,7 @@ zero, which is the honest answer rather than a guessed store.
 """
 
 import importlib.util
+import os
 
 
 class AdapterError(Exception):
@@ -264,7 +265,7 @@ class NullAdapter(StoreAdapter):
 
 def load_adapter(path):
     """Load the `ADAPTER` instance from a python file. Raise AdapterError."""
-    if not path or not __import__("os").path.exists(path):
+    if not path or not os.path.exists(path):
         raise AdapterError("adapter file not found: %s" % path)
     spec = importlib.util.spec_from_file_location("woodbuild_adapter", path)
     if spec is None or spec.loader is None:
@@ -981,7 +982,10 @@ if __name__ == "__main__":
     unittest.main()
 ```
 
-Then add one FreeCAD-dependent test that validates the generic path builds a spec the validator accepts, in `skills/woodbuild-engine/scripts/tests/test_real_build.py`, and retarget that file's paths to the new workspace convention:
+Then retarget that file's paths to the new workspace convention (no new test is
+added there — see the plan's preflight rulings; the thin FreeCAD wrappers
+`wall_bounds`, `openings_from_cutters` and `check_envelope` stay covered by this
+optional end-to-end file, not by a mocked FreeCAD):
 
 ```python
 BUILD_DIR = os.path.expanduser("~/Documents/woodbuild/keter-pent97")
@@ -1850,7 +1854,6 @@ reference file:
 cd /Users/eric/pi-config
 mkdir -p skills/building-from-reference
 ```
-
 Create `skills/building-from-reference/reference/substitutions.md`:
 
 ```markdown
@@ -1880,12 +1883,13 @@ after the "Translate" step's paragraph:
    The general rules are in `reference/substitutions.md`.
 ```
 
-Delete what remains of the old skill:
+Delete what remains of the old skill (each path separately: one missing file must
+not silently cancel the whole deletion):
 
 ```bash
 cd /Users/eric/pi-config
-git rm -r --quiet skills/building-from-reference/stock-catalogue.md \
-                  skills/building-from-reference/substitutions.md 2>/dev/null || true
+git rm -q skills/building-from-reference/stock-catalogue.md
+git rm -q --ignore-unmatch skills/building-from-reference/substitutions.md
 ls -R skills/building-from-reference
 ```
 
@@ -1956,7 +1960,8 @@ import unittest
 from woodbuild.adapters import load_adapter
 
 SKILLS = pathlib.Path(__file__).resolve().parents[4] / "skills"
-STORE_WORDS = ("homedepot", "hd_search", "hd_product", "HD_DEFAULT_STORE", "MicroPro")
+STORE_WORDS = ("homedepot", "Home Depot", "hd_search", "hd_product",
+               "HD_DEFAULT_STORE", "MicroPro")
 STORE_OWNER = "homedepot-catalogue"
 # The two files whose job is to name the store in order to check the seam. Their
 # names are the whole exemption: any other file naming it is a regression.

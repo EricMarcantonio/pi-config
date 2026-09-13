@@ -6,8 +6,8 @@ import unittest
 from woodbuild import bom, frame, optimise, pricing, stock
 from woodbuild.spec import BuildSpec
 
-BUILD_DIR = os.path.expanduser("~/freecad/keter_pent97_build")
-SPEC_PATH = os.path.join(BUILD_DIR, "keter_pent97.spec.json")
+BUILD_DIR = os.path.expanduser("~/Documents/woodbuild/keter-pent97")
+SPEC_PATH = os.path.join(BUILD_DIR, "spec.json")
 PRICES = os.path.join(BUILD_DIR, "prices.json")
 
 

@@ -114,7 +114,7 @@ class TestCLI(unittest.TestCase):
                        "--today", "2026-09-12"])
         self.assertEqual(rc, 0)
         html = open(os.path.join(self.out, "budget.html")).read()
-        self.assertIn("tax 0.0%", html)   # the test adapter declares no tax table
+        self.assertIn("tax 25.0%", html)   # the test adapter declares a 25% rate
 
     STUB_MCP = '''
 import json, sys
@@ -147,6 +147,9 @@ class A(StoreAdapter):
     source_product = "product"
     default_store = "7011"
     server_path = None
+
+    def tax_rate(self, province):
+        return 0.25
 
 ADAPTER = A()
 '''

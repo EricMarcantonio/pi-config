@@ -58,6 +58,16 @@ class TestLoadAdapter(unittest.TestCase):
         with self.assertRaises(AdapterError):
             load_adapter("/nonexistent/adapter.py")
 
+    def test_an_adapter_value_that_is_not_a_store_adapter_is_an_error(self):
+        path = self._write("ADAPTER = object()\n")
+        with self.assertRaises(AdapterError):
+            load_adapter(path)
+
+    def test_an_adapter_that_raises_on_import_is_an_error(self):
+        path = self._write("raise RuntimeError('broken adapter import')\n")
+        with self.assertRaises(AdapterError):
+            load_adapter(path)
+
     def test_the_shipped_store_adapter_satisfies_the_protocol(self):
         import json
         import pathlib

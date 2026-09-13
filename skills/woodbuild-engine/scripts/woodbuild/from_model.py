@@ -108,16 +108,23 @@ def openings_from_cutters(doc, envelope, door_name="fw_door", band_name="fw_band
     band = doc.getObject(band_name)
     if door is None or band is None:
         raise SpecError("model is missing %s / %s cutters" % (door_name, band_name))
-    dbb = door.Shape.BoundBox
-    bbb = band.Shape.BoundBox
-    door_head = round(dbb.ZMax, 2)
+    dbox = _shape_box(door)
+    if dbox is None:
+        raise SpecError("%s cutter has no shape; a null cutter cannot define an "
+                        "opening" % door_name)
+    bbox = _shape_box(band)
+    if bbox is None:
+        raise SpecError("%s cutter has no shape; a null cutter cannot define an "
+                        "opening" % band_name)
+    door_head = round(dbox[5], 2)
     band_block = band_opening(
-        model_band=(round(bbb.XLength, 2), round(bbb.ZLength, 2), round(bbb.ZMin, 2)),
+        model_band=(round(bbox[1] - bbox[0], 2), round(bbox[5] - bbox[4], 2),
+                    round(bbox[4], 2)),
         envelope_width=envelope["width"], corner_width=corner_width,
         height_tall=envelope["height_tall"], roof_build_up=roof_build_up,
         door_head=door_head)
-    return [{"wall": "front", "kind": "door", "width": round(dbb.XLength, 2),
-             "height": round(dbb.ZLength, 2), "sill": 0.0, "header": "2x8"},
+    return [{"wall": "front", "kind": "door", "width": round(dbox[1] - dbox[0], 2),
+             "height": round(dbox[5] - dbox[4], 2), "sill": 0.0, "header": "2x8"},
             band_block] + list(extra)
 
 

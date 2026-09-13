@@ -145,9 +145,21 @@ class TestCutters(unittest.TestCase):
                                     roof_build_up=120.0, extra=extra)
         self.assertEqual([o["kind"] for o in got], ["door", "band", "transom"])
 
-    def test_missing_cutters_are_refused(self):
+    def test_missing_or_null_cutters_are_refused(self):
         with self.assertRaises(SpecError):
             openings_from_cutters(StubDoc([]), self.ENVELOPE)
+        # a failed boolean leaves a null cutter; it must be refused loudly, not
+        # read as a zero-size opening that trivially clears the door head
+        null_door = StubDoc([StubObj("fw_door", None),
+                             StubObj("fw_band", StubBox(0, 2698.92, 0, 1,
+                                                        1878.06, 2178.06))])
+        with self.assertRaises(SpecError):
+            openings_from_cutters(null_door, self.ENVELOPE)
+        null_band = StubDoc([StubObj("fw_door", StubBox(0, 1386.84, 0, 1,
+                                                        0, 1811.02)),
+                             StubObj("fw_band", None)])
+        with self.assertRaises(SpecError):
+            openings_from_cutters(null_band, self.ENVELOPE)
 
 
 class TestEnvelopeCheck(unittest.TestCase):

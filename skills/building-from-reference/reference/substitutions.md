@@ -1,7 +1,8 @@
 # Rules for translating a reference
 
-The store-specific rows live with the store (`homedepot-catalogue/substitutions-hd.md`).
-These rules are general and came out of more than one build.
+The store-level material lessons live with the store
+(`homedepot-catalogue/substitutions-hd.md`). These rules are general and came out
+of more than one build.
 
 - **A substitution that changes the diagram must say so.** Say it in the row's
   `changes_diagram` and in the deviations table.

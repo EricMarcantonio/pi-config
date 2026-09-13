@@ -65,7 +65,7 @@ lives there and not beside `spec.json`.
 
 ```bash
 cd ~/Documents/woodbuild/<slug>
-E=../woodbuild-engine/scripts   # absolute: <repo>/skills/woodbuild-engine/scripts
+E=<repo>/skills/woodbuild-engine/scripts
 python3 $E/woodbuild.py --spec spec.json --prices prices.json --out out
 python3 $E/woodbuild.py --spec spec.json --prices prices.json --out out --candidates \
   --adapter <repo>/skills/homedepot-catalogue/scripts/homedepot_adapter.py

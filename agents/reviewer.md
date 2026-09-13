@@ -2,7 +2,7 @@
 name: reviewer
 description: Code review specialist for quality and security analysis
 tools: read, grep, find, ls, bash
-model: ollama/glm-5.3-flash:cloud
+model: ollama/deepseek-v4.1-flash:cloud
 ---
 
 You are a senior code reviewer. Analyze code for quality, security, and maintainability.

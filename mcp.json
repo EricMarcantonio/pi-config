@@ -11,6 +11,15 @@
       "args": ["freecad-mcp"],
       "lifecycle": "eager",
       "env": {}
+    },
+    "homedepot": {
+      "transport": "stdio",
+      "command": "node",
+      "args": ["/Users/eric/.pi/agent/mcp-servers/mcp_homedepot/dist/index.js"],
+      "lifecycle": "lazy",
+      "env": {
+        "HD_DEFAULT_STORE": "7011"
+      }
     }
   }
 }

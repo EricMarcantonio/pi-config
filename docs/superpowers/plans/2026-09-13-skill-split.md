@@ -901,7 +901,7 @@ Replace the report/tax tail:
 
     t = bom.totals(lines, tax_rate)
     if tax_rate == 0.0:
-        print("note: tax reported as 0.0%; pass --adapter for a store's rate",
+        print("note: tax reported as 0.0%; no store rate applied",
               file=sys.stderr)
     print("%s: %d parts, %d sheet plan(s), %d board plan(s)" %
           (spec.data.get("build"), len(parts), len(sheet_plans), len(board_plans)))
@@ -2289,7 +2289,8 @@ Replace the single "Skills" bullet (`README.md`, the bullet beginning
 `- **Skills**: three skills live in \`skills/\``) with:
 
 ```markdown
-- **Skills**: seven skills live in `skills/` and sync with this repo. Together they
+- **Skills**: seven skills from this split live in `skills/` and sync with this repo,
+  alongside two pre-existing ones. Together they
   turn a reference structure (product page, photo, drawing, CAD model) into a
   buildable wood version with a cutlist, an optimised cart and a deviations table.
   They are single-purpose by design, and a test enforces it
@@ -2359,8 +2360,7 @@ python3 /Users/eric/pi-config/skills/woodbuild-engine/scripts/woodbuild.py \
 ls out
 ```
 
-Expected: exit 0, the four output files listed, and a `note: no province ... tax
-reported as 0.0%` line. Then confirm the adapter changes that:
+Expected: exit 0, the four output files listed, and a `note: tax reported as 0.0%` line. Then confirm the adapter changes that:
 
 ```bash
 python3 /Users/eric/pi-config/skills/woodbuild-engine/scripts/woodbuild.py \

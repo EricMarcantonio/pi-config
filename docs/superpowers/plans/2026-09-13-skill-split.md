@@ -315,6 +315,7 @@ git commit -m "engine: add the store adapter protocol"
 
 **Files:**
 - Modify: `skills/woodbuild-engine/scripts/woodbuild/pricing.py`
+- Modify: `skills/woodbuild-engine/scripts/woodbuild/__init__.py` (lazy `cli_main`)
 - Modify: `skills/woodbuild-engine/scripts/tests/test_pricing.py`
 
 **Interfaces:**
@@ -351,7 +352,11 @@ class FakeAdapter(StoreAdapter):
 ```
 
 3. Rename `FakeTransport`'s docstring from `"""Stands in for the Home Depot MCP server."""` to `"""Stands in for a store MCP server."""`.
-4. Replace every `"hd_product"` string in the file with `"product"` and every `"hd_search"` with `"search"`.
+4. Replace every `"hd_product"` source label in the file with `"product"` and every
+   `"hd_search"` with `"search"`. Tool-name assertions are a different thing and
+   must match the adapter: a call's tool is `FakeAdapter.product_tool` (`"verify"`)
+   or `FakeAdapter.search_tool` (`"find"`), never the source label. The `"tried"`
+   list in an unpriced reason carries the tool name too.
 5. Add `adapter=FakeAdapter()` to every `resolve(...)`, `candidates(...)` and `set_price(...)` call in the file that passes a `transport=`. Leave the offline `resolve(spec, cache, transport=None)` calls alone — the default `None` adapter keeps them working.
 6. Add three new tests to `class TestAgentMatchedPricing`:
 
@@ -500,6 +505,23 @@ def set_price(cache, cls, sku, why, transport, adapter=None, store=None, today=N
                        source=adapter.source_product)
 ```
 
+`woodbuild/__init__.py` also changes: it eagerly imports `cli_main`, which imports `report.py`,
+so once `pricing` stops exporting `tax_rate_for` that eager import breaks every
+`from woodbuild.pricing import ...`. Replace it with a PEP 562 lazy accessor:
+
+```python
+"""woodbuild - reference structure -> wood cutlist, optimised buy plan, priced cart."""
+__version__ = "0.1.0"
+
+
+def __getattr__(name):
+    """Expose `cli_main` lazily: importing the package must not pull in the CLI."""
+    if name == "cli_main":
+        from .cli import cli_main
+        return cli_main
+    raise AttributeError("module %r has no attribute %r" % (__name__, name))
+```
+
 ```python
 def resolve(spec, cache, transport=None, adapter=None, refresh=False, today=None):
     """Return {stock class: price entry} for agent-matched classes only.
@@ -536,7 +558,11 @@ def resolve(spec, cache, transport=None, adapter=None, refresh=False, today=None
             cache.mark_unpriced(cls, "not agent-matched", [])
             continue
         if refresh and transport is not None and cache.is_stale(cls, days=7, today=today):
-            store_id = str(cache.store or adapter.default_store or "")
+            # refresh re-verifies an existing match, so it needs the store that
+            # match came from. With no store in the spec or the cache, refuse:
+            # querying the adapter's default store could record a price for a
+            # different store than the one this entry was matched against.
+            store_id = str(cache.store or "")
             if not store_id:
                 cache.mark_unpriced(cls, "no store configured for a refresh", [])
                 continue

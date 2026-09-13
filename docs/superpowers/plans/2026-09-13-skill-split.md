@@ -397,6 +397,21 @@ class FakeAdapter(StoreAdapter):
         self.assertIn("no store", cache.data["unpriced"]["2x4"]["reason"])
 ```
 
+7. In the existing `test_set_price_uses_the_spec_store_on_a_storeless_cache`, change
+   the final storeless `set_price` call to pass `adapter=FakeAdapter()` while still
+   expecting `PriceError` — the test must prove a default store is never used to
+   price a class:
+
+```python
+        storeless = PriceCache(tmp_path())
+        storeless.data = {"items": {}, "unpriced": {}}
+        with self.assertRaises(PriceError):
+            # FakeAdapter carries a default_store, and it must NOT be used: a price
+            # fetched from a default store would later be labelled with the spec's.
+            set_price(storeless, "2x4", "1000123456", "x", NeverCalledT(),
+                      adapter=FakeAdapter())
+```
+
 - [ ] **Step 2: Run tests to verify they fail**
 
 ```bash
@@ -486,12 +501,13 @@ def set_price(cache, cls, sku, why, transport, adapter=None, store=None, today=N
     """Verify the SKU with the adapter's product tool, then record the match.
 
     `store` must come from the spec: a cache that has never been written has no
-    store of its own, and querying a national id would record a price that later
-    gets labelled with the spec's store.
+    store of its own, and querying a default store would record a price that
+    later gets labelled with the spec's store. With no store at all, refuse —
+    `adapter.default_store` is for search candidates, which are not prices.
     """
     adapter = _adapter(adapter)
     today = today or date.today().isoformat()
-    store_id = str(store or cache.store or adapter.default_store or "")
+    store_id = str(store or cache.store or "")
     if not store_id:
         raise PriceError("set_price needs a store: pass the spec's store")
     payload = transport.call(adapter.product_tool, {"sku": sku, "storeId": store_id})

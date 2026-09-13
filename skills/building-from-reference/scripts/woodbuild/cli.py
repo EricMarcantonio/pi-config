@@ -45,7 +45,9 @@ def cli_main(argv=None):
         else:
             command, server_args = "node", [args.server]
         transport = pricing.StdioMCP(command, server_args,
-                                     env=dict(os.environ, HD_DEFAULT_STORE=str(cache.store or "7011")))
+                                     env=dict(os.environ, HD_DEFAULT_STORE=str(
+                                         spec.data.get("pricing", {}).get("store")
+                                         or cache.store or "7011")))
     try:
         if args.set_price:
             cls, sku = args.set_price
@@ -53,8 +55,12 @@ def cli_main(argv=None):
                 print("pricing error: --set-price needs the MCP server at %s" % args.server,
                       file=sys.stderr)
                 return 2
+            if cls not in spec.search_terms():
+                print("warning: %s is not in the spec's pricing.search map, so it "
+                      "will never appear in a budget" % cls, file=sys.stderr)
             try:
                 pricing.set_price(cache, cls, sku, args.why or "", transport,
+                                  store=spec.data.get("pricing", {}).get("store"),
                                   today=args.today)
             except (pricing.PriceError, pricing.PricingTransportError) as exc:
                 print("pricing error: %s" % exc, file=sys.stderr)

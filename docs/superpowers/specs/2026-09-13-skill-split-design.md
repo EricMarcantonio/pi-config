@@ -156,7 +156,17 @@ never guesses one, and creates:
 The CLI writes everything it produces under `--out`, so `candidates.json` sits there
 beside the workbook rather than beside `spec.json`.
 
-Root `~/Documents/woodbuild/` is overridable with a flag. Invariants are machine-
+Two conventions follow from a workspace living outside the repo:
+
+- **No build identity in the repo.** A store skill may keep the *general* lessons a build
+  taught (what the store does not stock, which substitute works), but not the build's own
+  SKU, product name, or dimensions, and not a row-per-substitution table for it. Those
+  rows are re-derivable spec data, written into that build's own `spec.json`.
+- **Engine paths in prose are absolute.** `../woodbuild-engine/scripts` only resolves when
+  the working directory is inside the repo, which a build workspace never is. Document
+  `<repo>/skills/woodbuild-engine/scripts`.
+
+Invariants are machine-
 checked where they can be (`spec.envelope` is already the fixed thing, and
 `spec.validate()` refuses an envelope that no longer closes); `decisions.md` carries
 the human reasoning that cannot be checked.
@@ -231,8 +241,10 @@ CAD model ── freecad-model-to-spec ───────┤
 
 ## Testing
 
-- Suite moves to `skills/woodbuild-engine/scripts/tests/`; run with
-  `python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -v`.
+- Suite moves to `skills/woodbuild-engine/scripts/tests/`; run from the repo root with
+  `python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests -t skills/woodbuild-engine/scripts`.
+  The `-t` is required: the tests and the `woodbuild` package are siblings under
+  `scripts/`, and without the top-level dir the `woodbuild` import fails.
 - Existing tests keep passing except those that exercised the deleted KeterPent97
   path (`test_spec_from_freecad.py` is rewritten against `from_model.py` with
   caller-supplied object names and no project constants).

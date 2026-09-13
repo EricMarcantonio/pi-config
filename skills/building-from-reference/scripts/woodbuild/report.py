@@ -58,6 +58,24 @@ def _num(v, dash="unpriced"):
     return dash if v is None else "%.2f" % v
 
 
+def _provenance(line, cache):
+    """What backs a line's price: an agent match, a raw candidate, or nothing.
+
+    Returns (label, warn). The cache entry is authoritative: a line built from
+    an agent-matched class is labelled 'agent' even if the line carries a
+    search source, and an old hd_search entry with no matched_by is a candidate
+    that still needs verifying.
+    """
+    entry = cache.get(line.stock) if cache is not None else None
+    if entry and entry.get("matched_by") == "agent":
+        return "agent", False
+    if line.source == "hd_search":
+        return "candidate - verify", True
+    if line.unit_price is None:
+        return "unpriced", True
+    return (line.source or "-"), False
+
+
 def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None):
     t = totals(lines, tax_rate_for(cache.province or "ON"))
     rows = cutlist_rows(parts, sheet_plans, board_plans)
@@ -143,11 +161,13 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
         desc = e(line.description)
         if line.source == "hd_search":
             desc += " <span class=warn>matched by description - verify SKU</span>"
+        prov, warn = _provenance(line, cache)
+        prov_html = ("<span class=warn>%s</span>" % e(prov)) if warn else e(prov)
         out.append("<tr%s><td>%s</td><td>%s</td><td class=num>%g %s</td>"
                    "<td class=num>%s</td><td class=num>%s</td><td>%s</td></tr>"
                    % (cls_attr, desc, e(line.sku or "-"), line.qty,
                       e(line.uom), _num(line.unit_price), _num(line.line_total()),
-                      e(line.source or "-")))
+                      prov_html))
     if current is not None:
         out.append("</table>")
 

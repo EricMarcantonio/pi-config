@@ -58,6 +58,24 @@ class TestLoadAdapter(unittest.TestCase):
         with self.assertRaises(AdapterError):
             load_adapter("/nonexistent/adapter.py")
 
+    def test_the_shipped_store_adapter_satisfies_the_protocol(self):
+        import json
+        import pathlib
+        repo = pathlib.Path(__file__).resolve().parents[4]
+        path = repo / "skills" / "homedepot-catalogue" / "scripts" / "homedepot_adapter.py"
+        self.assertTrue(path.exists(), "the store adapter must exist at %s" % path)
+        a = load_adapter(str(path))
+        self.assertEqual(a.search_tool, "hd_search")
+        self.assertEqual(a.product_tool, "hd_product")
+        self.assertEqual(a.default_store, "7011")
+        self.assertAlmostEqual(a.tax_rate("ON"), 0.13)
+        self.assertAlmostEqual(a.tax_rate("ZZ"), 0.0)
+        self.assertTrue(a.is_candidate("hd_search"))
+        self.assertFalse(a.is_candidate("hd_product"))
+        self.assertTrue(str(a.server_path).endswith("index.js"))
+        self.assertEqual(a.env("7011"), {"HD_DEFAULT_STORE": "7011"})
+        json.dumps({})          # the module must not need a config file to load
+
     def test_legacy_candidate_labels_come_from_the_adapter(self):
         path = self._write(
             "from woodbuild.adapters import StoreAdapter\n"

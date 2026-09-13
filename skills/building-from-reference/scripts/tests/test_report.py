@@ -108,6 +108,13 @@ class TestReport(unittest.TestCase):
                           self.cache, today="2026-09-12")
         # the consumables in self.lines are unpriced too, so count them honestly
         self.assertIn("excludes %d unpriced" % len(unpriced(lines)), html)
+    def test_methodology_states_consumable_coverage_assumptions(self):
+        html = render_html(self.spec, self.parts, self.sheets, self.boards,
+                          self.lines, self.cache, today="2026-09-12")
+        self.assertIn("295 ml cartridge", html)
+        self.assertIn("300 ml cartridge", html)
+        self.assertIn("waste factor", html)
+
     def test_description_matched_prices_are_flagged(self):
         lines = [BomLine("lumber", "2x4", "2x4 SPF", 1, "each", 4.25,
                          sku="1", source="hd_search"),

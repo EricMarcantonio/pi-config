@@ -5,7 +5,7 @@ import csv
 import html as html_mod
 import os
 
-from . import stock
+from . import bom, stock
 from .bom import totals, unpriced
 from .pricing import tax_rate_for
 
@@ -182,10 +182,18 @@ def render_html(spec, parts, sheet_plans, board_plans, lines, cache, today=None)
     sub = spec.substitutions()
     out.append("<h2>Methodology</h2><p class=sub>Dimensions in mm; stock is imperial. "
                "Kerf %.1f mm. Parts are placed by shelf packing; grain-locked parts "
-               "are never rotated. Prices come from the committed cache; a fetch "
-               "refreshes only missing or stale classes. %d substitutions recorded, "
-               "%d of them change the diagram.</p>"
-               % (stock.KERF, len(sub), sum(1 for s in sub if s.get("changes_diagram"))))
+               "are never rotated. Consumables are derived from geometry and carry an "
+               "explicit %.0f%% waste factor: screws at %g per %g mm of framing, "
+               "sheathing nails at %g/%g mm o.c., adhesive at ~7 m per 295 ml "
+               "cartridge, sealant at ~10 m per 300 ml cartridge. Pieces and "
+               "millilitres are converted to packs only when the agent match records "
+               "a pack size; without one the line stays unpriced. Prices come from "
+               "the committed cache; a fetch refreshes only missing or stale "
+               "classes. %d substitutions recorded, %d of them change the diagram.</p>"
+               % (stock.KERF, (bom.CONSUMABLE_OVERBUY - 1) * 100,
+                  bom.SCREWS_PER_CONNECTION, bom.SCREW_CONNECTION_SPACING_MM,
+                  bom.SHEATHING_FASTENER_EDGE_MM, bom.SHEATHING_FASTENER_FIELD_MM,
+                  len(sub), sum(1 for s in sub if s.get("changes_diagram"))))
     return "\n".join(out)
 
 

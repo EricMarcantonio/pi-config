@@ -249,6 +249,22 @@ class TestAgentMatchedPricing(unittest.TestCase):
         with self.assertRaises(PriceError):
             set_price(storeless, "2x4", "1000123456", "x", NeverCalledT())
 
+    def test_set_price_records_the_pack_size_with_the_match(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "7011", "province": "ON", "items": {}}
+
+        class ProductT:
+            def call(self, tool, arguments):
+                return {"name": "3 in exterior framing screws (50-Qty)",
+                        "price": 23.98, "url": "https://example/1001828336"}
+
+        set_price(cache, "screws_3in", "1001828336", "the 50-count framing box",
+                  ProductT(), store="7011", today="2026-09-12", pack="50 count")
+        entry = cache.get("screws_3in")
+        self.assertEqual(entry["pack"], "50 count")
+        self.assertEqual(entry["matched_by"], "agent")
+        self.assertEqual(entry["price"], 23.98)
+
     def test_put_matched_refuses_an_entry_without_a_sku(self):
         cache = PriceCache(tmp_path())
         cache.data = {"items": {}, "unpriced": {}}

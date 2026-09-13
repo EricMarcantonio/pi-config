@@ -70,6 +70,32 @@ class TestBom(unittest.TestCase):
         self.assertEqual(screws.sku, "555")
         self.assertEqual(screws.source, "hd_search")
 
+    def test_consumables_are_physical_amounts(self):
+        parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]
+        cons = consumables({"options": {}}, parts)
+        screws = [c for c in cons if c.stock == "screws_3in"][0]
+        self.assertEqual(screws.uom, "each")          # pieces, not boxes
+        self.assertGreater(screws.qty, 0)
+        adhesive = [c for c in cons if c.stock == "adhesive"][0]
+        self.assertEqual(adhesive.uom, "ml")
+
+    def test_pack_size_converts_pieces_to_packs(self):
+        parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]
+        prices = {"screws_3in": {"price": 23.98, "sku": "1", "matched_by": "agent",
+                                 "pack": "50 count"}}
+        lines = build_bom(parts, [], [], prices=prices, spec={"options": {}})
+        screws = [l for l in lines if l.stock == "screws_3in"][0]
+        self.assertEqual(screws.uom, "pack")
+        self.assertIn("50", screws.note)
+
+    def test_unknown_pack_size_stays_unpriced(self):
+        parts = [Part(id="stud", w=2000.0, h=89.0, qty=10, stock="2x4")]
+        prices = {"screws_3in": {"price": 23.98, "sku": "1", "matched_by": "agent"}}
+        lines = build_bom(parts, [], [], prices=prices, spec={"options": {}})
+        screws = [l for l in lines if l.stock == "screws_3in"][0]
+        self.assertIsNone(screws.line_total())
+        self.assertIn("pack size", screws.note)
+
     def test_totals_apply_hst(self):
         lines = [BomLine("lumber", "2x4", "2x4 SPF", 10, "each", 4.25),
                  BomLine("lumber", "2x6", "2x6 SPF", 2, "each", 9.98, sku=None)]

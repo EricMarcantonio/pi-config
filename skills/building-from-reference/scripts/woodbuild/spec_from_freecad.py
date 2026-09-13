@@ -9,6 +9,10 @@ import json
 import os
 import sys
 
+from .bom import (ADHESIVE_ML_PER_M_JOINT, CONSUMABLE_OVERBUY,
+                  SCREW_CONNECTION_SPACING_MM, SCREWS_PER_CONNECTION,
+                  SEALANT_ML_PER_M_JOINT, SHEATHING_FASTENER_EDGE_MM,
+                  SHEATHING_FASTENER_FIELD_MM)
 from .spec import BuildSpec, SpecError
 
 # locked build decisions (design doc, "Reference -> wood translation")
@@ -140,7 +144,14 @@ def spec_skeleton(envelope):
             "hinges": "shed door hinges",
             "hasp": "hasp and staple lock",
             "gravel": "crushed gravel 3/4 inch"}},
-        "options": {"kerf": 3.0, "retain_offcut_min": 300.0},
+        "options": {"kerf": 3.0, "retain_offcut_min": 300.0,
+                    "screw_connection_spacing_mm": SCREW_CONNECTION_SPACING_MM,
+                    "screws_per_connection": SCREWS_PER_CONNECTION,
+                    "sheathing_fastener_edge_mm": SHEATHING_FASTENER_EDGE_MM,
+                    "sheathing_fastener_field_mm": SHEATHING_FASTENER_FIELD_MM,
+                    "adhesive_ml_per_m_joint": ADHESIVE_ML_PER_M_JOINT,
+                    "sealant_ml_per_m_joint": SEALANT_ML_PER_M_JOINT,
+                    "consumable_overbuy": CONSUMABLE_OVERBUY},
     }
 
 

@@ -47,6 +47,7 @@ lives there and not beside `spec.json`.
    dimensional consequence, as a row in `spec.json`'s `substitutions`. Anything the
    store does not stock becomes a substitution row. Changing the diagram is expected;
    hiding it is not.
+   The general rules are in `reference/substitutions.md`.
 4. **Write the spec** — one `spec.json`. With a CAD model, `from_model` derives the
    envelope and the door and band openings; everything else is locked decisions you
    write down.

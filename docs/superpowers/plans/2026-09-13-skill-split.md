@@ -635,6 +635,7 @@ git commit -m "engine: price through an injected store adapter"
 - Modify: `skills/woodbuild-engine/scripts/woodbuild/cli.py`
 - Modify: `skills/woodbuild-engine/scripts/tests/test_report.py`
 - Modify: `skills/woodbuild-engine/scripts/tests/test_cli.py`
+- Modify: `skills/woodbuild-engine/scripts/tests/test_bom.py` (neutral source labels only)
 
 **Interfaces:**
 - Consumes: `StoreAdapter`/`load_adapter` (Task 2), the new `pricing` signatures (Task 3).
@@ -697,7 +698,11 @@ ADAPTER = A()
 
 3. Add `self.adapter = os.path.join(self.dir, "adapter.py")` to `setUp` and write `ADAPTER_PY` into it.
 4. Add `"--adapter", self.adapter` to every `cli_main([...])` call that uses `--server`.
-5. Add to `class TestCLI`:
+5. In `test_bom.py`, replace the two store source labels with the neutral pair:
+   `"hd_product"` → `"product"` at line 32 and `"hd_search"` → `"search"` at lines
+   66 and 71 (the assertion at 71 asserts the label it just set, so it changes too).
+   `bom.py` copies a price entry's `source` through, so no production code changes.
+6. Add to `class TestCLI`:
 
 ```python
     def test_offline_run_without_an_adapter_reports_zero_tax(self):

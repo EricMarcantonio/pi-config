@@ -52,7 +52,7 @@ pi-config/skills/
 ├── build-pricing/SKILL.md
 ├── homedepot-catalogue/SKILL.md, stock-availability.md, substitutions-hd.md,
 │   scripts/homedepot_adapter.py
-├── freecad-model-to-spec/SKILL.md, references/
+├── freecad-model-to-spec/SKILL.md
 └── woodbuild-engine/SKILL.md, scripts/woodbuild.py, scripts/woodbuild/*.py,
     scripts/tests/
 ```
@@ -82,6 +82,8 @@ names a store. It exposes:
 | `product_tool` | MCP tool used to verify a chosen SKU |
 | `source_search` | label written into a line and cache entry for a search hit |
 | `source_product` | label written for a verified product |
+| `candidate_sources` | source labels that mean "not yet verified", including legacy ones such as `hd_search` |
+| `server_path` | path to the MCP server entry point, or `None` |
 | `default_store` | store id used when the spec names none |
 | `tax_rate(province)` | tax rate for the spec's province |
 | `env()` | extra environment for the MCP subprocess |
@@ -176,7 +178,12 @@ restate the framing or pricing policy that lives in the visible skills.
 `tests/test_boundaries.py` walks `skills/` and asserts:
 
 1. No directory except `homedepot-catalogue/` contains a store name (`homedepot`,
-   `hd_search`, `hd_product`, `HD_DEFAULT_STORE`, `MicroPro`) in any `.py` or `.md`.
+   `hd_search`, `hd_product`, `HD_DEFAULT_STORE`, `MicroPro`) in any `.py` or `.md` —
+   **including `tests/`**, so engine tests use neutral source labels (`search`,
+   `product`) and legacy labels are recognised only through
+   `adapter.candidate_sources`. The guard itself and the engine test that verifies
+   the shipped adapter are the only two exempt files, and a test asserts exactly
+   that.
 2. `woodbuild/` contains no tax numbers (`TAX_RATES`, province rate literals).
 3. Every directory with a `SKILL.md` has a `description` and a `name` matching its
    directory name.

@@ -1963,6 +1963,18 @@ package. Do not split the tree across packages.
 | module | responsibility |
 |---|---|
 | `stock.py` | stock geometry: sheet sizes, board sections, sale lengths, kerf. No availability |
+| `spec.py` | the spec dataclass, derived dimensions, `validate()` |
+| `frame.py` | framing derivation (the rules are in `wood-framing`) |
+| `optimise.py` | sheet nesting and board cutting-stock |
+| `bom.py` | bill of materials and consumable amounts from geometry |
+| `pricing.py` | the price cache and the candidate/verify/resolve policy |
+| `adapters.py` | `StoreAdapter`, `NullAdapter`, `load_adapter` — the store seam |
+| `from_model.py` | FreeCAD document → envelope and openings; the only FreeCAD importer |
+| `report.py` | `budget.html`, `cutlist.csv`, `cart.csv`, `sku-qty.txt` |
+| `cli.py` | the command line and the pipeline order |
+
+The engine names **no** store, tool, store id or tax rate. Those arrive as a
+`StoreAdapter`; with none, prices come from the cache only and tax is 0.0.
 
 ## Stock geometry
 
@@ -1990,18 +2002,6 @@ imperial because that is what a builder asks for at the saw.
 Optimiser constants: **kerf 3.0 mm** between adjacent parts and at board cut ends;
 **offcuts ≥ 300 mm** reported as reusable. The rules that use them are in
 `sheet-and-board-nesting`.
-| `spec.py` | the spec dataclass, derived dimensions, `validate()` |
-| `frame.py` | framing derivation (the rules are in `wood-framing`) |
-| `optimise.py` | sheet nesting and board cutting-stock |
-| `bom.py` | bill of materials and consumable amounts from geometry |
-| `pricing.py` | the price cache and the candidate/verify/resolve policy |
-| `adapters.py` | `StoreAdapter`, `NullAdapter`, `load_adapter` — the store seam |
-| `from_model.py` | FreeCAD document → envelope and openings; the only FreeCAD importer |
-| `report.py` | `budget.html`, `cutlist.csv`, `cart.csv`, `sku-qty.txt` |
-| `cli.py` | the command line and the pipeline order |
-
-The engine names **no** store, tool, store id or tax rate. Those arrive as a
-`StoreAdapter`; with none, prices come from the cache only and tax is 0.0.
 
 ## Running
 

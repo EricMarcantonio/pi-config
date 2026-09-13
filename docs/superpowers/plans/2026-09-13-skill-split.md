@@ -1960,8 +1960,11 @@ import unittest
 from woodbuild.adapters import load_adapter
 
 SKILLS = pathlib.Path(__file__).resolve().parents[4] / "skills"
-STORE_WORDS = ("homedepot", "Home Depot", "hd_search", "hd_product",
-               "HD_DEFAULT_STORE", "MicroPro")
+# The store's identity, not the skill's directory name: the visible skills must be
+# able to point at `homedepot-catalogue/scripts/homedepot_adapter.py`, so the bare
+# skill slug is deliberately not a banned token. The store's own names are.
+STORE_WORDS = ("Home Depot", "homedepot.ca", "homedepot.com", "hd_search",
+               "hd_product", "HD_DEFAULT_STORE", "MicroPro")
 STORE_OWNER = "homedepot-catalogue"
 # The two files whose job is to name the store in order to check the seam. Their
 # names are the whole exemption: any other file naming it is a regression.

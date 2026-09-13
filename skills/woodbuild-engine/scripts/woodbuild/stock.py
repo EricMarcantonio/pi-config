@@ -1,7 +1,8 @@
-"""Home Depot Canada stock catalogue: sheet goods, dimensional lumber, kerf.
+"""Stock geometry catalogue: sheet goods, dimensional lumber, kerf.
 
-All sizes in mm. Imperial names are kept because that is what the store sells
-and what a builder asks for at the saw.
+All sizes in mm. Imperial names are kept because that is what a builder asks for
+at the saw. This module knows geometry, not availability: whether a store carries
+a class is the store adapter's business.
 """
 
 KERF = 3.0

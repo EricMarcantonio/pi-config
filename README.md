@@ -57,7 +57,8 @@ not by an Ollama package. See the Notes below.
   turn a reference structure (product page, photo, drawing, CAD model) into a
   buildable wood version with a cutlist, an optimised cart and a deviations table.
   They are single-purpose by design, and a test enforces it
-  (`tests/test_boundaries.py`: no store name outside `homedepot-catalogue`):
+  (`skills/woodbuild-engine/scripts/tests/test_boundaries.py`: no store name outside
+  `homedepot-catalogue`):
   - `building-from-reference` — orchestration: intake, invariants, translation, spec,
     verification. Owns the workspace convention (`~/Documents/woodbuild/<slug>/`).
   - `wood-framing` — studs, plates, corners, headers, rafters, blocking, panelisation.

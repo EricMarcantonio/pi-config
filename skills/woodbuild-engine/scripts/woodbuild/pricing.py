@@ -250,11 +250,12 @@ def set_price(cache, cls, sku, why, transport, adapter=None, store=None, today=N
 
     `store` must come from the spec: a cache that has never been written has no
     store of its own, and querying a national id would record a price that later
-    gets labelled with the spec's store.
+    gets labelled with the spec's store. `adapter.default_store` is for search
+    candidates only (see `candidates`), never for pricing a class.
     """
     adapter = _adapter(adapter)
     today = today or date.today().isoformat()
-    store_id = str(store or cache.store or adapter.default_store or "")
+    store_id = str(store or cache.store or "")
     if not store_id:
         raise PriceError("set_price needs a store: pass the spec's store")
     payload = transport.call(adapter.product_tool, {"sku": sku, "storeId": store_id})

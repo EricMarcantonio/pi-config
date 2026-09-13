@@ -261,7 +261,10 @@ class TestAgentMatchedPricing(unittest.TestCase):
         storeless = PriceCache(tmp_path())
         storeless.data = {"items": {}, "unpriced": {}}
         with self.assertRaises(PriceError):
-            set_price(storeless, "2x4", "1000123456", "x", NeverCalledT())
+            # FakeAdapter.default_store is "0001": a default store must never
+            # stand in for the spec's store when pricing.
+            set_price(storeless, "2x4", "1000123456", "x", NeverCalledT(),
+                      adapter=FakeAdapter())
 
     def test_set_price_records_the_pack_size_with_the_match(self):
         cache = PriceCache(tmp_path())

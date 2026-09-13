@@ -900,8 +900,8 @@ Replace the report/tax tail:
                                 today=args.today)
 
     t = bom.totals(lines, tax_rate)
-    if not province:
-        print("note: no province in the spec or cache; tax reported as 0.0%%",
+    if tax_rate == 0.0:
+        print("note: tax reported as 0.0%%; pass --adapter for a store's rate",
               file=sys.stderr)
     print("%s: %d parts, %d sheet plan(s), %d board plan(s)" %
           (spec.data.get("build"), len(parts), len(sheet_plans), len(board_plans)))
@@ -2293,7 +2293,8 @@ Replace the single "Skills" bullet (`README.md`, the bullet beginning
   turn a reference structure (product page, photo, drawing, CAD model) into a
   buildable wood version with a cutlist, an optimised cart and a deviations table.
   They are single-purpose by design, and a test enforces it
-  (`tests/test_boundaries.py`: no store name outside `homedepot-catalogue`):
+  (`skills/woodbuild-engine/scripts/tests/test_boundaries.py`: no store name outside
+  `homedepot-catalogue`):
   - `building-from-reference` — orchestration: intake, invariants, translation, spec,
     verification. Owns the workspace convention (`~/Documents/woodbuild/<slug>/`).
   - `wood-framing` — studs, plates, corners, headers, rafters, blocking, panelisation.

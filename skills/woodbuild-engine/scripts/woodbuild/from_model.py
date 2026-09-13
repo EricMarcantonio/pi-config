@@ -100,7 +100,9 @@ def openings_from_cutters(doc, envelope, door_name="fw_door", band_name="fw_band
 
     Everything else an opening needs — transoms, louvres, headers, sills — is
     spec data the caller supplies through `extra`, because a model's cutters do
-    not carry intent.
+    not carry intent. For a real build `roof_build_up` is mandatory: its `0.0`
+    default silently places the band at the wall top instead of under the roof
+    build-up.
     """
     door = doc.getObject(door_name)
     band = doc.getObject(band_name)

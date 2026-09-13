@@ -1,8 +1,9 @@
 import unittest
 
 from woodbuild.from_model import (band_opening, bounds_from_shapes,
-                                  envelope_from_bounds)
-from woodbuild.spec import BuildSpec
+                                  check_envelope, envelope_from_bounds,
+                                  openings_from_cutters, wall_bounds)
+from woodbuild.spec import SpecError
 
 
 class TestBounds(unittest.TestCase):
@@ -58,6 +59,112 @@ class TestBand(unittest.TestCase):
                          envelope_width=2788.92, corner_width=89.0,
                          height_tall=2258.06, roof_build_up=400.0,
                          door_head=1811.02)
+
+
+class StubBox:
+    def __init__(self, xmin, xmax, ymin, ymax, zmin, zmax):
+        self.XMin, self.XMax = xmin, xmax
+        self.YMin, self.YMax = ymin, ymax
+        self.ZMin, self.ZMax = zmin, zmax
+
+    @property
+    def XLength(self):
+        return self.XMax - self.XMin
+
+    @property
+    def ZLength(self):
+        return self.ZMax - self.ZMin
+
+
+class StubShape:
+    def __init__(self, box):
+        self.BoundBox = box
+
+    def isNull(self):
+        return self.BoundBox is None
+
+
+class StubObj:
+    def __init__(self, name, box):
+        self.Name = name
+        self.Shape = StubShape(box)
+
+
+class StubDoc:
+    def __init__(self, objs):
+        self.Objects = objs
+
+    def getObject(self, name):
+        return next((o for o in self.Objects if o.Name == name), None)
+
+
+class TestWallBounds(unittest.TestCase):
+    def test_wall_object_wins_over_the_naming_convention(self):
+        doc = StubDoc([StubObj("WallsOpen", StubBox(0, 10, 0, 20, 0, 30)),
+                       StubObj("panelCut", StubBox(0, 999, 0, 999, 0, 999))])
+        self.assertEqual(wall_bounds(doc, wall_object="WallsOpen"),
+                         (0, 10, 0, 20, 0, 30))
+
+    def test_naming_convention_selects_panels_and_posts(self):
+        doc = StubDoc([StubObj("sideCut", StubBox(0, 10, 0, 20, 0, 30)),
+                       StubObj("Post1", StubBox(-5, 10, 0, 20, 0, 30)),
+                       StubObj("ignored", StubBox(0, 500, 0, 500, 0, 500))])
+        self.assertEqual(wall_bounds(doc), (-5, 10, 0, 20, 0, 30))
+
+    def test_a_model_with_neither_is_refused(self):
+        with self.assertRaises(SpecError):
+            wall_bounds(StubDoc([StubObj("ignored", StubBox(0, 1, 0, 1, 0, 1))]))
+
+    def test_a_missing_named_object_is_refused(self):
+        with self.assertRaises(SpecError):
+            wall_bounds(StubDoc([]), wall_object="WallsOpen")
+
+
+class TestCutters(unittest.TestCase):
+    ENVELOPE = {"width": 2788.92, "depth": 2179.32, "height_tall": 2258.06,
+                "roof_fall": 200.0, "tall_side": "front"}
+
+    def _doc(self):
+        return StubDoc([StubObj("fw_door", StubBox(0, 1386.84, 0, 1, 0, 1811.02)),
+                        StubObj("fw_band", StubBox(0, 2698.92, 0, 1, 1878.06, 2178.06))])
+
+    def test_door_and_band_read_from_the_model(self):
+        got = openings_from_cutters(self._doc(), self.ENVELOPE, corner_width=89.0,
+                                    roof_build_up=120.0)
+        door, band = got[0], got[1]
+        self.assertEqual(door["kind"], "door")
+        self.assertAlmostEqual(door["width"], 1386.84)
+        self.assertAlmostEqual(door["height"], 1811.02)
+        self.assertAlmostEqual(band["width"], 2610.92)
+        self.assertAlmostEqual(band["sill"], 1838.06)
+
+    def test_extra_openings_are_appended_in_order(self):
+        extra = [{"wall": "left", "kind": "transom", "width": 595.0,
+                  "height": 220.0, "sill": 1511.02, "header": None}]
+        got = openings_from_cutters(self._doc(), self.ENVELOPE, corner_width=89.0,
+                                    roof_build_up=120.0, extra=extra)
+        self.assertEqual([o["kind"] for o in got], ["door", "band", "transom"])
+
+    def test_missing_cutters_are_refused(self):
+        with self.assertRaises(SpecError):
+            openings_from_cutters(StubDoc([]), self.ENVELOPE)
+
+
+class TestEnvelopeCheck(unittest.TestCase):
+    class StubSpec:
+        envelope = {"width": 2788.92, "depth": 2179.32, "height_tall": 2258.06,
+                    "roof_fall": 200.0, "tall_side": "front"}
+
+    def test_a_matching_model_passes(self):
+        doc = StubDoc([StubObj("WallsOpen",
+                               StubBox(0, 2788.92, 0, 2179.32, 0, 2178.06))])
+        check_envelope(self.StubSpec(), doc, wall_object="WallsOpen")
+
+    def test_a_moved_model_is_refused(self):
+        doc = StubDoc([StubObj("WallsOpen",
+                               StubBox(0, 2800.0, 0, 2179.32, 0, 2178.06))])
+        with self.assertRaises(SpecError):
+            check_envelope(self.StubSpec(), doc, wall_object="WallsOpen")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,9 @@ from datetime import date
 TAX_RATES = {"ON": 0.13, "AB": 0.05, "BC": 0.12, "QC": 0.14975,
              "MB": 0.12, "SK": 0.11, "NS": 0.15, "NB": 0.15, "NL": 0.15, "PE": 0.15}
 
+# An agent match older than this must be re-judged, not silently trusted.
+MATCH_MAX_AGE_DAYS = 30
+
 
 class PriceError(Exception):
     """The cache and the spec disagree about which store the prices belong to."""
@@ -172,23 +175,89 @@ class StdioMCP:
                 pass
 
 
-def _entry_from_search(cls, payload, today):
-    products = payload.get("products") or []
-    for p in products:
-        if p.get("price") is not None:
-            return {"sku": p.get("sku"), "price": float(p["price"]),
-                    "desc": p.get("name"), "url": p.get("url"),
-                    "inStock": p.get("inStockOnline"),
-                    "source": "hd_search", "fetched": today}
-    return None
+def put_matched(cache, cls, entry, why, today=None):
+    """Record an agent's match. Requires a sku; stamps provenance."""
+    if not entry or not entry.get("sku"):
+        raise ValueError("an agent match needs a sku for class %r" % (cls,))
+    today = today or date.today().isoformat()
+    rec = dict(entry)
+    rec["matched_by"] = "agent"
+    rec["matched_on"] = today
+    rec["why"] = why
+    rec.setdefault("source", "hd_product")
+    rec.setdefault("fetched", today)
+    cache.put(cls, rec)
+    cache.data.setdefault("unpriced", {}).pop(cls, None)
+    return rec
+
+
+def _is_agent_matched(entry):
+    return bool(entry and entry.get("sku") and entry.get("matched_by") == "agent")
+
+
+def needs_match(spec, cache, days=MATCH_MAX_AGE_DAYS, today=None):
+    """[class] with no agent match, or one older than `days`."""
+    ref = date.fromisoformat(today) if today else date.today()
+    out = []
+    for cls in sorted(spec.search_terms()):
+        entry = cache.get(cls)
+        if not _is_agent_matched(entry):
+            out.append(cls)
+            continue
+        raw = entry.get("matched_on")
+        if not raw or (ref - date.fromisoformat(raw)).days > days:
+            out.append(cls)
+    return out
+
+
+def candidates(spec, transport, classes=None):
+    """{class: [{sku, name, price, url}]} from hd_search, for the agent to read.
+
+    A search hit is a candidate, never a price: this never touches the cache.
+    """
+    terms = spec.search_terms()
+    chosen = sorted(terms) if classes is None else list(classes)
+    store = spec.data.get("pricing", {}).get("store") or "9999"
+    out = {}
+    for cls in chosen:
+        query = terms.get(cls)
+        if not query:
+            continue
+        try:
+            payload = transport.call("hd_search", {"query": query,
+                                                     "storeId": store,
+                                                     "pageSize": 5})
+        except PricingTransportError:
+            out[cls] = []
+            continue
+        out[cls] = [{"sku": p.get("sku"), "name": p.get("name"),
+                     "price": p.get("price"), "url": p.get("url")}
+                    for p in ((payload or {}).get("products") or [])
+                    if p.get("sku")]
+    return out
+
+
+def set_price(cache, cls, sku, why, transport, today=None):
+    """Verify the SKU with hd_product, then record name/url/price + provenance."""
+    today = today or date.today().isoformat()
+    payload = transport.call("hd_product", {"sku": sku,
+                                             "storeId": cache.store or "9999"})
+    if not payload or payload.get("price") is None:
+        raise PricingTransportError("hd_product returned no price for sku %s" % sku)
+    entry = {"sku": sku, "desc": payload.get("name"),
+             "price": float(payload["price"]), "url": payload.get("url"),
+             "source": "hd_product", "fetched": today}
+    return put_matched(cache, cls, entry, why, today=today)
 
 
 def resolve(spec, cache, transport=None, refresh=False, today=None):
-    """Return {stock class: price entry}. Offline unless refresh and a transport.
+    """Return {stock class: price entry} for agent-matched classes only.
 
-    Refresh touches only missing or stale classes. A cache priced for a different
-    store than the spec is a hard error: silently pricing the wrong store is a
-    money-correctness hazard.
+    A script may never accept a search hit as a price: an unmatched class stays
+    `unpriced` with reason 'not agent-matched'. With a transport, refresh
+    re-verifies the price of an already-matched sku via hd_product; a stale
+    match is a re-matching prompt, never silent trust. A cache priced for a
+    different store than the spec is a hard error.
     """
     today = today or date.today().isoformat()
     cache.load()                 # a cache handed in cold reads its file first
@@ -204,29 +273,40 @@ def resolve(spec, cache, transport=None, refresh=False, today=None):
         cache.data["store"] = want_store
     if want_prov and not cache.data.get("province"):
         cache.data["province"] = want_prov
+
     terms = spec.search_terms()
-    for cls, query in terms.items():
+    unpriced = cache.data.setdefault("unpriced", {})
+    result = {}
+    for cls in terms:
         entry = cache.get(cls)
-        if entry and not cache.is_stale(cls, days=7, today=today):
-            continue                              # fresh: refresh only touches stale classes
-        if transport is None:
+        if not _is_agent_matched(entry):
+            cache.mark_unpriced(cls, "not agent-matched", [])
             continue
-        try:
-            payload = transport.call("hd_search", {"query": query,
-                                                    "storeId": cache.store or "9999",
-                                                    "pageSize": 5})
-        except PricingTransportError as exc:
-            cache.mark_unpriced(cls, "transport error: %s" % exc, ["hd_search"])
-            continue
-        found = _entry_from_search(cls, payload or {}, today)
-        if found:
-            cache.put(cls, found)
-            cache.data.get("unpriced", {}).pop(cls, None)
-        else:
-            cache.mark_unpriced(cls, "null price returned", ["hd_search"])
+        if refresh and transport is not None and cache.is_stale(cls, days=7, today=today):
+            try:
+                payload = transport.call("hd_product", {"sku": entry["sku"],
+                                                         "storeId": cache.store or "9999"})
+            except PricingTransportError as exc:
+                cache.mark_unpriced(cls, "transport error: %s" % exc, ["hd_product"])
+                continue
+            price = (payload or {}).get("price")
+            if price is None:
+                cache.mark_unpriced(cls, "null price returned", ["hd_product"])
+                continue
+            entry = dict(entry)
+            entry.update({"price": float(price),
+                          "desc": payload.get("name", entry.get("desc")),
+                          "url": payload.get("url", entry.get("url")),
+                          "source": "hd_product", "fetched": today})
+            cache.put(cls, entry)
+        unpriced.pop(cls, None)
+        result[cls] = entry
+
+    if not terms:                # a spec with no search terms prices every match
+        result = {cls: e for cls, e in cache.data.get("items", {}).items()
+                  if _is_agent_matched(e)}
     cache.data["fetched"] = today
-    return {cls: e for cls, e in cache.data.get("items", {}).items()
-            if cls in terms or not terms}
+    return {cls: e for cls, e in result.items() if cls in terms or not terms}
 
 
 def compare(old, new):

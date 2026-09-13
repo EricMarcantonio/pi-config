@@ -117,6 +117,19 @@ class TestReport(unittest.TestCase):
                           self.cache, today="2026-09-12")
         self.assertEqual(html.count("matched by description - verify SKU"), 1)
 
+    def test_bom_labels_provenance(self):
+        self.cache.data["items"] = {"2x4": {"sku": "1", "price": 4.25, "source": "hd_product",
+                                            "matched_by": "agent", "matched_on": "2026-09-12",
+                                            "why": "the stud"}}
+        html = render_html(self.spec, self.parts, self.sheets, self.boards, self.lines,
+                          self.cache, today="2026-09-12")
+        self.assertIn("agent", html)
+        candidate = [BomLine("lumber", "2x6", "2x6 SPF", 1, "each", 9.0, sku="9",
+                             source="hd_search")]
+        html2 = render_html(self.spec, self.parts, self.sheets, self.boards, candidate,
+                           self.cache, today="2026-09-12")
+        self.assertIn("candidate", html2)
+
 
 if __name__ == "__main__":
     unittest.main()

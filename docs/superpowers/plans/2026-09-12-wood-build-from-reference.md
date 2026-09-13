@@ -10,6 +10,11 @@
 
 **Spec:** `~/.pi/agent/docs/superpowers/specs/2026-09-12-wood-build-from-reference-design.md`
 
+> **Amended during execution.** `2026-09-12-wood-build-from-reference-RULINGS.md`
+> records every ruling made while implementing this plan, the four tasks the plan does not
+> contain (11b-11e), and which of the plan's own code blocks are superseded. It is
+> authoritative where the two disagree; the SDD ledger holds the per-task detail.
+
 ## Global Constraints
 
 - **Engine is stdlib-only.** `import FreeCAD` is permitted **only** in `spec_from_freecad.py`; every other module must import cleanly under plain `python3`.

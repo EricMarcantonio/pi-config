@@ -2098,7 +2098,9 @@ python3 - <<'PY'
 import pathlib, re
 want = {"building-from-reference", "wood-framing", "sheet-and-board-nesting",
         "build-pricing", "homedepot-catalogue", "freecad-model-to-spec",
-        "woodbuild-engine"}
+        "woodbuild-engine",
+        # pre-existing, unrelated to this split and not to be touched or counted
+        "freecad-model-hygiene", "freecad-render-views"}
 found = {p.parent.name for p in pathlib.Path("skills").rglob("SKILL.md")}
 missing, extra = want - found, found - want
 print("found:", sorted(found))

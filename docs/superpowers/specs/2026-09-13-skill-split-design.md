@@ -84,7 +84,7 @@ names a store. It exposes:
 | `source_product` | label written for a verified product |
 | `candidate_sources` | source labels that mean "not yet verified", including legacy ones such as `hd_search` |
 | `server_path` | path to the MCP server entry point, or `None` |
-| `default_store` | store id used when the spec names none |
+| `default_store` | store id used for a *search candidate* when the spec names none; never used to price a class, where an explicit store or a hard error is required |
 | `tax_rate(province)` | tax rate for the spec's province |
 | `env()` | extra environment for the MCP subprocess |
 

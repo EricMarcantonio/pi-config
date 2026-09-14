@@ -9,6 +9,7 @@
     "npm:pi-caveman",
     "git:github.com/obra/superpowers",
     "npm:pi-mcp-extension",
-    "npm:@blazer2k/searxng-suite"
+    "npm:@blazer2k/searxng-suite",
+    "git:github.com/EricMarcantonio/skills"
   ]
 }

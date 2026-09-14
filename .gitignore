@@ -26,3 +26,7 @@ models.json.pre-*
 
 # subagent-driven-development scratch
 .superpowers/
+
+# personal working docs: design notes, plans and rulings stay on disk, not in the
+# shared config
+docs/superpowers/

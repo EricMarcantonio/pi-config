@@ -53,37 +53,23 @@ not by an Ollama package. See the Notes below.
   cd ~/.pi/agent/mcp-servers/mcp_homedepot && npm install && npm run build
   ```
   Pinned to upstream commit `8ef0178`. Its tools are `hd_search`, `hd_product`, `hd_store_availability`, `hd_stores`; `HD_DEFAULT_STORE=7011` is set in `mcp.json`.
-- **Skills**: seven skills from this split live in `skills/` and sync with this repo,
-  alongside two pre-existing ones. Together they
-  turn a reference structure (product page, photo, drawing, CAD model) into a
-  buildable wood version with a cutlist, an optimised cart and a deviations table.
-  They are single-purpose by design, and a test enforces it
-  (`skills/woodbuild-engine/scripts/tests/test_boundaries.py`: no store name outside
-  `homedepot-catalogue`):
-  - `building-from-reference` — orchestration: intake, invariants, translation, spec,
-    verification. Owns the workspace convention (`~/Documents/woodbuild/<slug>/`).
-  - `wood-framing` — studs, plates, corners, headers, rafters, blocking, panelisation.
-  - `sheet-and-board-nesting` — kerf, offcuts, grain locking, sheet and board choice.
-  - `build-pricing` — the store-agnostic pricing method: judge, verify, provenance,
-    staleness, honest `unpriced`.
-  - `homedepot-catalogue` — the only store-specific skill: MCP wiring, store ids,
-    provincial tax, availability traps, and the `homedepot_adapter.py` the engine takes.
-  - `freecad-model-to-spec` — generic FreeCAD ingestion: envelope from the model,
-    door and band cutters, envelope drift checks.
-  - `woodbuild-engine` — the stdlib-only engine itself, hidden from the model prompt
-    (`disable-model-invocation`), reached by the other six at
-    `<repo>/skills/woodbuild-engine/scripts`; a build workspace lives outside the
-    repo, so a relative path from the workspace cannot resolve.
-  `freecad-render-views` covers FreeCAD 1.1's view API limits (per-document ActiveView,
-  read-only viewPosition, late/stale captures, TechDraw pages breaking the MCP
-  screenshot path). `freecad-model-hygiene` covers disjoint-part modelling, the silent
-  boolean failures, and the DAG-root overlap audit.
-
-  Engine tests (run from the repo root; the top-level dir matters):
+- **Skills**: none are bundled here. The skills this config used to carry now live in a
+  plugin marketplace, published as a pi package:
+  [github.com/EricMarcantonio/skills](https://github.com/EricMarcantonio/skills). pi
+  installs it from `settings.json`'s `packages` entry:
 
   ```bash
-  python3 -m unittest discover -s skills/woodbuild-engine/scripts/tests \
-    -t skills/woodbuild-engine/scripts
+  pi install git:github.com/EricMarcantonio/skills
+  ```
+
+  The clone lands in `git/github.com/EricMarcantonio/skills/` (this directory is
+  gitignored), and the skills load from `plugins/*/skills/`. Engine tests, run from the
+  clone:
+
+  ```bash
+  python3 -m unittest discover \
+    -s plugins/woodbuild/skills/woodbuild-engine/scripts/tests \
+    -t plugins/woodbuild/skills/woodbuild-engine/scripts
   ```
 - **Build workspaces**: a build's `spec.json`, price cache, `decisions.md` and
   `out/` live outside this repo in `~/Documents/woodbuild/<slug>/` (the convention
@@ -94,9 +80,10 @@ not by an Ollama package. See the Notes below.
 - **Web tools**: `@blazer2k/searxng-suite` provides `web_search` and `web_extract`, backed by a local SearXNG instance. `SEARXNG_URL` is set to `http://localhost:8080` in `~/.zshrc` (Docker setup lives in `~/searxng`). Ollama is used only for reasoning; the former `@ollama/pi-web-search` package is intentionally not used.
 - **Vision / image input**: pi only forwards image attachments to models whose `models.json` entry lists `"input": ["text", "image"]`. Without it the model silently receives text only. Verified by an image probe (prompt tokens 31 → 340 when an image is attached): image-capable are `deepseek-v4.1-flash:cloud` and `kimi-k3:cloud`; `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud` reject images with HTTP 400. Regenerating `models.json` can drop the `input` field, so re-add it if attachments stop reaching the model.
 - **MCP servers**: `mcp.json` configures MCP servers for `npm:pi-mcp-extension` (global scope, applies to all projects). Two stdio servers: `freecad` (`uvx freecad-mcp`) and `homedepot`. `freecad` bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp_freecad_*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp`.
-  `homedepot` is reached by the engine through
-  `skills/homedepot-catalogue/scripts/homedepot_adapter.py` (`--adapter`); without it
-  the engine prices from the cache only and reports tax as zero.
+  `homedepot` is reached by the engine through the
+  `plugins/homedepot/skills/homedepot-catalogue/scripts/homedepot_adapter.py` inside
+  the installed package clone (`--adapter`); without it the engine prices from the
+  cache only and reports tax as zero.
 - **MCP config path gotcha**: `pi-mcp-extension` hardcodes its global config path as `~/.pi/agent/mcp.json`; it does **not** honour `PI_CODING_AGENT_DIR`. Since this config dir is `~/pi-config`, that path is a symlink into this repo:
   ```bash
   ln -sfn ~/pi-config/mcp.json ~/.pi/agent/mcp.json

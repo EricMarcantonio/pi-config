@@ -71,7 +71,9 @@ not by an Ollama package. See the Notes below.
   - `freecad-model-to-spec` — generic FreeCAD ingestion: envelope from the model,
     door and band cutters, envelope drift checks.
   - `woodbuild-engine` — the stdlib-only engine itself, hidden from the model prompt
-    (`disable-model-invocation`), shared by the other six by relative path.
+    (`disable-model-invocation`), reached by the other six at
+    `<repo>/skills/woodbuild-engine/scripts`; a build workspace lives outside the
+    repo, so a relative path from the workspace cannot resolve.
   `freecad-render-views` covers FreeCAD 1.1's view API limits (per-document ActiveView,
   read-only viewPosition, late/stale captures, TechDraw pages breaking the MCP
   screenshot path). `freecad-model-hygiene` covers disjoint-part modelling, the silent

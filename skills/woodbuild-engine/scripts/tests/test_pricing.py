@@ -3,14 +3,30 @@ import os
 import tempfile
 import unittest
 
+from woodbuild.adapters import StoreAdapter
 from woodbuild.pricing import (PriceCache, PriceError, PricingTransportError,
                                StdioMCP, candidates, compare, needs_match, put_matched,
                                resolve, set_price)
 from woodbuild.spec import BuildSpec
 
 
+class FakeAdapter(StoreAdapter):
+    """A neutral store: no real product names, no tax table, no store literals."""
+
+    name = "fake"
+    search_tool = "find"
+    product_tool = "verify"
+    source_search = "search"
+    source_product = "product"
+    candidate_sources = ("search", "legacy_search")
+    default_store = "0001"
+
+    def tax_rate(self, province):
+        return {"ON": 0.13}.get(province, 0.0)
+
+
 class FakeTransport:
-    """Stands in for the Home Depot MCP server."""
+    """Stands in for a store MCP server."""
 
     def __init__(self, results):
         self.results = results
@@ -39,7 +55,7 @@ SEARCH_MISS_PRICE = {"products": [{"sku": "1000999999", "name": "7/16 OSB",
                                    "price": None, "url": "https://example/x",
                                    "inStockOnline": False}]}
 MATCHED = {"sku": "1000123456", "desc": "2x4x8 SPF Stud", "price": 4.25,
-           "url": "https://example/1000123456", "source": "hd_product",
+           "url": "https://example/1000123456", "source": "product",
            "matched_by": "agent", "matched_on": "2026-09-12",
            "why": "the 8 ft SPF stud the framing schedule calls for"}
 
@@ -50,7 +66,7 @@ class TestPricing(unittest.TestCase):
         cache = PriceCache(path)
         cache.data = {"store": "7011", "province": "ON",
                       "items": {"2x4": {"sku": "1000123456", "price": 4.19,
-                                        "source": "hd_search",
+                                        "source": "search",
                                         "matched_by": "agent",
                                         "matched_on": "2026-09-11",
                                         "why": "the stud"}}}
@@ -62,20 +78,20 @@ class TestPricing(unittest.TestCase):
     def test_fetch_refreshes_matched_sku_and_stamps_provenance(self):
         cache = PriceCache(tmp_path())
         cache.data = {"store": "7011", "province": "ON", "items": {
-            "2x4": {"sku": "1000123456", "price": 3.00, "source": "hd_product",
+            "2x4": {"sku": "1000123456", "price": 3.00, "source": "product",
                     "fetched": "2026-01-01", "matched_by": "agent",
                     "matched_on": "2026-01-01", "why": "the stud"}}}
         spec = make_spec({"2x4": "2x4x8 SPF stud"})
         transport = FakeTransport({"1000123456": {"name": "2x4x8 SPF Stud",
                                                  "price": 4.25,
                                                  "url": "https://example/1000123456"}})
-        prices = resolve(spec, cache, transport=transport, refresh=True,
-                         today="2026-09-12")
-        self.assertEqual(transport.calls[0][0], "hd_product")
+        prices = resolve(spec, cache, transport=transport, adapter=FakeAdapter(),
+                         refresh=True, today="2026-09-12")
+        self.assertEqual(transport.calls[0][0], "verify")
         self.assertEqual(transport.calls[0][1]["sku"], "1000123456")
         self.assertEqual(prices["2x4"]["sku"], "1000123456")
         self.assertEqual(prices["2x4"]["price"], 4.25)
-        self.assertEqual(prices["2x4"]["source"], "hd_product")
+        self.assertEqual(prices["2x4"]["source"], "product")
         self.assertEqual(prices["2x4"]["fetched"], "2026-09-12")
         self.assertEqual(prices["2x4"]["matched_by"], "agent")
 
@@ -83,19 +99,19 @@ class TestPricing(unittest.TestCase):
         cache = PriceCache(tmp_path())
         cache.data = {"store": "7011", "province": "ON", "items": {
             "osb_7_16": {"sku": "1000999999", "price": 28.98,
-                         "source": "hd_product", "fetched": "2026-01-01",
+                         "source": "product", "fetched": "2026-01-01",
                          "matched_by": "agent", "matched_on": "2026-01-01",
                          "why": "the sheathing"}}}
         spec = make_spec({"osb_7_16": "7/16 OSB sheathing"})
         transport = FakeTransport({"1000999999": {"name": "7/16 OSB",
                                                  "price": None,
                                                  "url": "https://example/x"}})
-        prices = resolve(spec, cache, transport=transport, refresh=True,
-                         today="2026-09-12")
+        prices = resolve(spec, cache, transport=transport, adapter=FakeAdapter(),
+                         refresh=True, today="2026-09-12")
         self.assertIsNone(prices.get("osb_7_16", {}).get("price"))
         self.assertEqual(cache.data["unpriced"]["osb_7_16"]["reason"],
                          "null price returned")
-        self.assertIn("hd_product", cache.data["unpriced"]["osb_7_16"]["tried"])
+        self.assertIn("verify", cache.data["unpriced"]["osb_7_16"]["tried"])
 
     def test_cache_persists_and_marks_staleness(self):
         path = tmp_path()
@@ -133,7 +149,8 @@ class TestPricing(unittest.TestCase):
         spec = make_spec({"2x4": "2x4x8 SPF stud", "2x6": "2x6x8 SPF"})
         transport = FakeTransport({"1": {"name": "2x4x8 SPF Stud", "price": 4.25},
                                    "2": {"name": "2x6x8 SPF", "price": 9.50}})
-        resolve(spec, cache, transport=transport, refresh=True, today="2026-09-12")
+        resolve(spec, cache, transport=transport, adapter=FakeAdapter(),
+                refresh=True, today="2026-09-12")
         self.assertEqual([c[1]["sku"] for c in transport.calls], ["2"])
 
     def test_transport_error_marks_unpriced_with_its_own_reason(self):
@@ -147,8 +164,8 @@ class TestPricing(unittest.TestCase):
             def call(self, tool, arguments):
                 raise PricingTransportError("server died")
 
-        prices = resolve(spec, cache, transport=Exploding(), refresh=True,
-                         today="2026-09-12")
+        prices = resolve(spec, cache, transport=Exploding(), adapter=FakeAdapter(),
+                         refresh=True, today="2026-09-12")
         self.assertNotIn("2x4", prices)
         self.assertIn("server died", cache.data["unpriced"]["2x4"]["reason"])
 
@@ -168,11 +185,6 @@ class TestPricing(unittest.TestCase):
         self.assertEqual(cache.data["store"], "7011")
         self.assertEqual(cache.store, "7011")
 
-    def test_tax_rate_lookup(self):
-        from woodbuild.pricing import tax_rate_for
-        self.assertEqual(tax_rate_for("ON"), 0.13)
-        self.assertEqual(tax_rate_for("AB"), 0.05)
-
 
 class TestAgentMatchedPricing(unittest.TestCase):
     def test_resolve_prices_only_agent_matched_classes(self):
@@ -189,10 +201,10 @@ class TestAgentMatchedPricing(unittest.TestCase):
         cache.data = {"store": "7011", "province": "ON", "items": {}}
         spec = make_spec({"2x4": "2x4x8 SPF stud"})
         transport = FakeTransport({"2x4x8 SPF stud": SEARCH_HIT})
-        found = candidates(spec, transport)
+        found = candidates(spec, transport, adapter=FakeAdapter())
         self.assertEqual(found["2x4"][0]["sku"], "1000123456")
         self.assertEqual(cache.data["items"], {})          # nothing priced by a script
-        prices = resolve(spec, cache, transport=transport)
+        prices = resolve(spec, cache, transport=transport, adapter=FakeAdapter())
         self.assertNotIn("2x4", prices)
 
     def test_needs_match_flags_unmatched_and_stale(self):
@@ -214,17 +226,19 @@ class TestAgentMatchedPricing(unittest.TestCase):
                         "url": "https://example/1000123456"}
 
         t = ProductT()
-        set_price(cache, "2x4", "1000123456", "the 8 ft SPF stud", t, today="2026-09-12")
+        set_price(cache, "2x4", "1000123456", "the 8 ft SPF stud", t,
+                  adapter=FakeAdapter(), today="2026-09-12")
         entry = cache.get("2x4")
-        self.assertEqual(t.tool, "hd_product")
+        self.assertEqual(t.tool, "verify")
         self.assertEqual(entry["matched_by"], "agent")
         self.assertEqual(entry["matched_on"], "2026-09-12")
         self.assertEqual(entry["why"], "the 8 ft SPF stud")
         self.assertEqual(entry["price"], 4.25)
 
     def test_set_price_uses_the_spec_store_on_a_storeless_cache(self):
-        # a fresh cache has no store; hd_product must be queried for the spec's
-        # store, never the national 9999, or a national price gets mislabelled.
+        # a fresh cache has no store; the adapter's product tool must be queried
+        # for the spec's store, never a national id, or a national price gets
+        # mislabelled.
         cache = PriceCache(tmp_path())
         cache.data = {"items": {}, "unpriced": {}}          # no store field at all
         calls = []
@@ -236,7 +250,7 @@ class TestAgentMatchedPricing(unittest.TestCase):
                         "url": "https://example/1000123456"}
 
         set_price(cache, "2x4", "1000123456", "the stud", RecordingT(),
-                  store="7011", today="2026-09-12")
+                  adapter=FakeAdapter(), store="7011", today="2026-09-12")
         self.assertEqual(calls[0][1]["storeId"], "7011")
         self.assertEqual(cache.get("2x4")["price"], 4.25)
 
@@ -247,7 +261,10 @@ class TestAgentMatchedPricing(unittest.TestCase):
         storeless = PriceCache(tmp_path())
         storeless.data = {"items": {}, "unpriced": {}}
         with self.assertRaises(PriceError):
-            set_price(storeless, "2x4", "1000123456", "x", NeverCalledT())
+            # FakeAdapter.default_store is "0001": a default store must never
+            # stand in for the spec's store when pricing.
+            set_price(storeless, "2x4", "1000123456", "x", NeverCalledT(),
+                      adapter=FakeAdapter())
 
     def test_set_price_records_the_pack_size_with_the_match(self):
         cache = PriceCache(tmp_path())
@@ -259,7 +276,8 @@ class TestAgentMatchedPricing(unittest.TestCase):
                         "price": 23.98, "url": "https://example/1001828336"}
 
         set_price(cache, "screws_3in", "1001828336", "the 50-count framing box",
-                  ProductT(), store="7011", today="2026-09-12", pack="50 count")
+                  ProductT(), adapter=FakeAdapter(), store="7011", today="2026-09-12",
+                  pack="50 count")
         entry = cache.get("screws_3in")
         self.assertEqual(entry["pack"], "50 count")
         self.assertEqual(entry["matched_by"], "agent")
@@ -270,6 +288,41 @@ class TestAgentMatchedPricing(unittest.TestCase):
         cache.data = {"items": {}, "unpriced": {}}
         with self.assertRaises(ValueError):
             put_matched(cache, "2x4", {"price": 4.25}, "no sku", today="2026-09-12")
+
+    def test_tools_come_from_the_adapter_not_the_engine(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": "0001", "province": "ON", "items": {}}
+        spec = BuildSpec({"pricing": {"store": "0001", "search": {"2x4": "2x4x8 stud"}}})
+        transport = FakeTransport({"1000123456": {"name": "stud", "price": 4.25}})
+        set_price(cache, "2x4", "1000123456", "the stud", transport,
+                  adapter=FakeAdapter(), store="0001", today="2026-09-12")
+        self.assertEqual(transport.calls[0][0], "verify")
+        self.assertEqual(cache.get("2x4")["source"], "product")
+
+    def test_candidates_use_the_adapter_search_tool_and_default_store(self):
+        spec = BuildSpec({"pricing": {"search": {"2x4": "2x4x8 stud"}}})
+        transport = FakeTransport({"2x4x8 stud": SEARCH_HIT})
+        found = candidates(spec, transport, adapter=FakeAdapter())
+        self.assertEqual(transport.calls[0][0], "find")
+        self.assertEqual(transport.calls[0][1]["storeId"], "0001")
+        self.assertEqual(found["2x4"][0]["sku"], "1000123456")
+
+    def test_refresh_with_no_store_anywhere_is_unpriced_not_guessed(self):
+        cache = PriceCache(tmp_path())
+        cache.data = {"store": None, "province": "ON", "items": {
+            "2x4": {"sku": "1", "price": 3.00, "source": "product",
+                    "fetched": "2026-01-01", "matched_by": "agent",
+                    "matched_on": "2026-01-01", "why": "stud"}}}
+        spec = BuildSpec({"pricing": {"search": {"2x4": "2x4x8 stud"}}})
+
+        class NeverCalled:
+            def call(self, tool, arguments):
+                raise AssertionError("must not query without a store")
+
+        prices = resolve(spec, cache, transport=NeverCalled(), adapter=FakeAdapter(),
+                         refresh=True, today="2026-09-12")
+        self.assertNotIn("2x4", prices)
+        self.assertIn("no store", cache.data["unpriced"]["2x4"]["reason"])
 
 
 class TestStdioMCP(unittest.TestCase):
@@ -304,7 +357,7 @@ for line in sys.stdin:
             fh.write(self.STUB)
         client = StdioMCP(sys.executable, [path])
         try:
-            payload = client.call("hd_search", {"query": "2x4x8 SPF stud"})
+            payload = client.call("search", {"query": "2x4x8 SPF stud"})
         finally:
             client.close()
             os.unlink(path)

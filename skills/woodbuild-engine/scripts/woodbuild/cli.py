@@ -4,11 +4,24 @@ import argparse
 import os
 import sys
 
-from . import bom, frame, optimise, pricing, report, stock
+from . import adapters, bom, frame, optimise, pricing, report, stock
 from .optimise import NestError
 from .spec import BuildSpec, SpecError
 
-HD_SERVER = os.path.expanduser("~/.pi/agent/mcp-servers/mcp_homedepot/dist/index.js")
+
+def _build_transport(server, adapter, spec, cache):
+    """The MCP stdio client, or None when this run needs no lookups."""
+    server = server or getattr(adapter, "server_path", None)
+    if not server or not os.path.exists(server):
+        return None, server
+    store = str(spec.data.get("pricing", {}).get("store")
+                or cache.store or adapter.default_store or "")
+    env = dict(os.environ, **(adapter.env(store) if store else {}))
+    if server.endswith(".py"):
+        command, server_args = sys.executable, [server]
+    else:
+        command, server_args = "node", [server]
+    return pricing.StdioMCP(command, server_args, env=env), server
 
 
 def cli_main(argv=None):
@@ -27,7 +40,10 @@ def cli_main(argv=None):
     ap.add_argument("--why", default=None, help="why the agent chose that product")
     ap.add_argument("--compare", help="old prices.json to diff against")
     ap.add_argument("--today", default=None)
-    ap.add_argument("--server", default=HD_SERVER)
+    ap.add_argument("--server", default=None,
+                    help="MCP server entry point; defaults to the adapter's server_path")
+    ap.add_argument("--adapter", default=None,
+                    help="python file defining an ADAPTER StoreAdapter instance")
     args = ap.parse_args(argv)
 
     try:
@@ -39,29 +55,31 @@ def cli_main(argv=None):
 
     cache = pricing.PriceCache(args.prices)
     cache.load()
+    try:
+        adapter = adapters.load_adapter(args.adapter) if args.adapter else adapters.NullAdapter()
+    except adapters.AdapterError as exc:
+        print("adapter error: %s" % exc, file=sys.stderr)
+        return 2
+    province = (spec.data.get("pricing", {}).get("province")
+                or cache.data.get("province") or "")
+    tax_rate = adapter.tax_rate(province)
     uses_transport = args.fetch or args.candidates or args.set_price
-    transport = None
-    if uses_transport and os.path.exists(args.server):
-        if args.server.endswith(".py"):
-            command, server_args = sys.executable, [args.server]
-        else:
-            command, server_args = "node", [args.server]
-        transport = pricing.StdioMCP(command, server_args,
-                                     env=dict(os.environ, HD_DEFAULT_STORE=str(
-                                         spec.data.get("pricing", {}).get("store")
-                                         or cache.store or "7011")))
+    transport, server_path = _build_transport(args.server, adapter, spec, cache) \
+        if uses_transport else (None, None)
+    if uses_transport and transport is None:
+        print("pricing error: no MCP server; pass --server or use an adapter with "
+              "server_path (looked at %s)" % (args.server or adapter.server_path),
+              file=sys.stderr)
+        return 2
     try:
         if args.set_price:
             cls, sku = args.set_price
-            if transport is None:
-                print("pricing error: --set-price needs the MCP server at %s" % args.server,
-                      file=sys.stderr)
-                return 2
             if cls not in spec.search_terms():
                 print("warning: %s is not in the spec's pricing.search map, so it "
                       "will never appear in a budget" % cls, file=sys.stderr)
             try:
                 pricing.set_price(cache, cls, sku, args.why or "", transport,
+                                  adapter=adapter,
                                   store=spec.data.get("pricing", {}).get("store"),
                                   today=args.today, pack=args.pack)
             except (pricing.PriceError, pricing.PricingTransportError) as exc:
@@ -74,12 +92,8 @@ def cli_main(argv=None):
                    " [%s]" % entry["pack"] if entry.get("pack") else ""))
             return 0
         if args.candidates:
-            if transport is None:
-                print("pricing error: --candidates needs the MCP server at %s" % args.server,
-                      file=sys.stderr)
-                return 2
             pending = pricing.needs_match(spec, cache, today=args.today)
-            found = pricing.candidates(spec, transport, classes=pending)
+            found = pricing.candidates(spec, transport, adapter=adapter, classes=pending)
             if not os.path.isdir(args.out):
                 os.makedirs(args.out)
             path = os.path.join(args.out, "candidates.json")
@@ -90,8 +104,8 @@ def cli_main(argv=None):
             print("%d class(es) need an agent match; candidates written to %s"
                   % (len(pending), path))
             return 0
-        prices = pricing.resolve(spec, cache, transport=transport, refresh=args.fetch,
-                                 today=args.today)
+        prices = pricing.resolve(spec, cache, transport=transport, adapter=adapter,
+                                 refresh=args.fetch, today=args.today)
     except pricing.PriceError as exc:
         print("pricing error: %s" % exc, file=sys.stderr)
         return 2
@@ -118,20 +132,24 @@ def cli_main(argv=None):
 
     lines = bom.build_bom(parts, sheet_plans, board_plans, prices=prices, spec=spec.data)
     paths = report.write_report(spec, parts, sheet_plans, board_plans, lines, cache,
-                                args.out, today=args.today)
+                                args.out, adapter=adapter, tax_rate=tax_rate,
+                                today=args.today)
 
-    t = bom.totals(lines, pricing.tax_rate_for(cache.province or "ON"))
+    t = bom.totals(lines, tax_rate)
+    if tax_rate == 0.0:
+        print("note: tax reported as 0.0%; no store rate applied",
+              file=sys.stderr)
     print("%s: %d parts, %d sheet plan(s), %d board plan(s)" %
           (spec.data.get("build"), len(parts), len(sheet_plans), len(board_plans)))
     print("subtotal $%.2f + tax $%.2f = $%.2f (%d lines, %d unpriced, tax rate %.3f)" %
-          (t["subtotal"], t["tax"], t["total"], t["lines"], t["unpriced"],
-           pricing.tax_rate_for(cache.province or "ON")))
+          (t["subtotal"], t["tax"], t["total"], t["lines"], t["unpriced"], tax_rate))
     pending = pricing.needs_match(spec, cache, today=args.today)
     print("agent-matched: %d, unmatched: %d" %
           (len(spec.search_terms()) - len(pending), len(pending)))
-    matched = sum(1 for l in lines if l.source == "hd_search")
+    matched = sum(1 for l in lines if adapter.is_candidate(l.source))
     if matched:
-        print("description-matched lines: %d (verify SKUs before ordering)" % matched)
+        print("unverified description-matched lines: %d (verify SKUs before ordering)"
+              % matched)
     for key in ("html", "cutlist", "cart", "sku_qty"):
         print("  %s" % paths[key])
 

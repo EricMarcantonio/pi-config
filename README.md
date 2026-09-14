@@ -40,6 +40,7 @@ pi install npm:pi-caveman
 pi install npm:pi-mcp-extension
 pi install npm:@blazer2k/searxng-suite
 pi install git:github.com/obra/superpowers
+pi install git:github.com/EricMarcantonio/skills
 ```
 
 Web search/extract is provided by `@blazer2k/searxng-suite` (local SearXNG),
@@ -71,6 +72,10 @@ not by an Ollama package. See the Notes below.
     -s plugins/woodbuild/skills/woodbuild-engine/scripts/tests \
     -t plugins/woodbuild/skills/woodbuild-engine/scripts
   ```
+
+  Because the entry is shared in `settings.json`, a colleague who clones this config
+  gets the author's public plugin package cloned and loaded by pi on first start;
+  `PI_OFFLINE=1` skips it.
 - **Build workspaces**: a build's `spec.json`, price cache, `decisions.md` and
   `out/` live outside this repo in `~/Documents/woodbuild/<slug>/` (the convention
   `building-from-reference` owns). Not versioned.

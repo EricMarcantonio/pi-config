@@ -103,6 +103,7 @@ function applyWordyFooter(ctx: ExtensionContext): void {
 				let cacheRead = 0;
 				let cacheWrite = 0;
 				let cost = 0;
+				let subagentCost = 0;
 				let latestHitRate: number | undefined;
 
 				const addUsage = (u: AssistantMessage["usage"] | undefined) => {
@@ -121,7 +122,21 @@ function applyWordyFooter(ctx: ExtensionContext): void {
 						const prompt = (u.input ?? 0) + (u.cacheRead ?? 0) + (u.cacheWrite ?? 0);
 						latestHitRate = prompt > 0 ? ((u.cacheRead ?? 0) / prompt) * 100 : undefined;
 					} else if (entry.type === "message" && entry.message.role === "toolResult") {
-						addUsage((entry.message as { usage?: AssistantMessage["usage"] }).usage);
+						const result = entry.message as {
+							toolName?: string;
+							usage?: AssistantMessage["usage"];
+							details?: { totalCost?: { costUsd?: number } };
+						};
+						addUsage(result.usage);
+						// pi-subagents reports the exact child cost (nested children included)
+						// in details.totalCost. usage.cost.total mirrors that number, so count
+						// exactly one of the two to keep the split honest.
+						const reported = result.details?.totalCost?.costUsd;
+						if (typeof reported === "number") {
+							subagentCost += reported;
+						} else if (result.toolName === "subagent") {
+							subagentCost += result.usage?.cost?.total ?? 0;
+						}
 					} else if (entry.type === "branch_summary" || entry.type === "compaction") {
 						addUsage((entry as { usage?: AssistantMessage["usage"] }).usage);
 					}
@@ -150,7 +165,18 @@ function applyWordyFooter(ctx: ExtensionContext): void {
 				if ((cacheRead || cacheWrite) && latestHitRate !== undefined) {
 					parts.push(theme.fg("dim", `cache-hit ${latestHitRate.toFixed(1)}%`));
 				}
-				if (cost) parts.push(theme.fg("dim", `cost $${cost.toFixed(3)}`));
+				if (cost || subagentCost) {
+					if (subagentCost > 0) {
+						// total is the same accumulation pi's builtin footer uses, so it
+						// already contains the child cost; chat is what remains.
+						const chatCost = Math.max(0, cost - subagentCost);
+						parts.push(theme.fg("dim", `chat $${chatCost.toFixed(3)}`));
+						parts.push(theme.fg("dim", `subagent $${subagentCost.toFixed(3)}`));
+						parts.push(theme.fg("dim", `total $${cost.toFixed(3)}`));
+					} else {
+						parts.push(theme.fg("dim", `cost $${cost.toFixed(3)}`));
+					}
+				}
 				parts.push(contextColored);
 
 				let left = parts.join("  ");

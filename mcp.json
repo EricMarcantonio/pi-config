@@ -9,7 +9,7 @@
       "transport": "stdio",
       "command": "uvx",
       "args": ["freecad-mcp"],
-      "lifecycle": "eager",
+      "lifecycle": "lazy",
       "env": {}
     },
     "homedepot": {
@@ -20,6 +20,13 @@
       "env": {
         "HD_DEFAULT_STORE": "7011"
       }
+    },
+    "blender": {
+      "transport": "stdio",
+      "command": "uv",
+      "args": ["--directory", "/Users/eric/blender_mcp/mcp", "run", "blender-mcp"],
+      "lifecycle": "lazy",
+      "env": {}
     }
   }
 }

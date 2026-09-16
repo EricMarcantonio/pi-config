@@ -98,11 +98,17 @@ not by an Ollama package. See the Notes below.
 - **Context windows** come from `ollama show <model>`.
 - **Web tools**: `@blazer2k/searxng-suite` provides `web_search` and `web_extract`, backed by a local SearXNG instance. `SEARXNG_URL` is set to `http://localhost:8080` in `~/.zshrc` (Docker setup lives in `~/searxng`). Ollama is used only for reasoning; the former `@ollama/pi-web-search` package is intentionally not used.
 - **Vision / image input**: pi only forwards image attachments to models whose `models.json` entry lists `"input": ["text", "image"]`. Without it the model silently receives text only. Verified by an image probe (prompt tokens 31 → 340 when an image is attached): image-capable are `deepseek-v4.1-flash:cloud` and `kimi-k3:cloud`; `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud` reject images with HTTP 400. Regenerating `models.json` can drop the `input` field, so re-add it if attachments stop reaching the model.
-- **MCP servers**: `mcp.json` configures MCP servers for `npm:pi-mcp-extension` (global scope, applies to all projects). Two stdio servers: `freecad` (`uvx freecad-mcp`) and `homedepot`. `freecad` bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp_freecad_*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp`.
+- **MCP servers**: `mcp.json` configures MCP servers for `npm:pi-mcp-extension` (global scope, applies to all projects). Three stdio servers, all `lifecycle: lazy` (start on first use, not at session start): `freecad`, `homedepot`, `blender`. `freecad` (`uvx freecad-mcp`) bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp_freecad_*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp`.
   `homedepot` is reached by the engine through the
   `plugins/homedepot/skills/homedepot-catalogue/scripts/homedepot_adapter.py` inside
   the installed package clone (`--adapter`); without it the engine prices from the
   cache only and reports tax as zero.
+  `blender` runs `uv --directory ~/blender_mcp/mcp run blender-mcp` against a
+  machine-local clone (gitignored, not in this repo) and needs the Blender addon
+  side running inside Blender:
+  ```bash
+  git clone https://projects.blender.org/lab/blender_mcp.git ~/blender_mcp
+  ```
 - **MCP config path gotcha**: `pi-mcp-extension` hardcodes its global config path as `~/.pi/agent/mcp.json`; it does **not** honour `PI_CODING_AGENT_DIR`. Since this config dir is `~/pi-config`, that path is a symlink into this repo:
   ```bash
   ln -sfn ~/pi-config/mcp.json ~/.pi/agent/mcp.json

@@ -85,7 +85,11 @@ not by an Ollama package. See the Notes below.
   (`runs.run` / `runs.all`), so the three `prompts/*.md` templates were rewritten.
   Only `agents/planner.md` remains local (no builtin equivalent); `scout`/`worker`/
   `reviewer` model pins now live in `settings.json` under `subagents.agentOverrides`
-  so the upstream builtin prompts win. Superpowers ships no agent definitions of its
+  so the upstream builtin prompts win. `subagents.modelScope` restricts subagents to
+  `ollama/deepseek-v4.1-flash:cloud` alone (`enforce: true`, `strict: true`), so an
+  out-of-scope model — including an inherited session model — is rejected before
+  launch rather than silently used. Model scope is policy, not selection: it rejects,
+  it does not pick a cheaper model. Superpowers ships no agent definitions of its
   own — its `Subagent (general-purpose):` templates map onto the `delegate` builtin.
   Tune with `/subagents-doctor`, `/subagents-guide`, `/subagents-fleet`, or JSON at
   `extensions/subagent/config.json` (present, holding `asyncByDefault`; note that

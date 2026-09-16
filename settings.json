@@ -7,6 +7,11 @@
   "wordyFooter": true,
   "subagents": {
     "defaultProvider": "ollama",
+    "modelScope": {
+      "enforce": true,
+      "strict": true,
+      "allow": ["ollama/deepseek-v4.1-flash:cloud"]
+    },
     "agentOverrides": {
       "scout": { "model": "deepseek-v4.1-flash:cloud" },
       "worker": { "model": "deepseek-v4.1-flash:cloud" },

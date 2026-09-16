@@ -6,18 +6,21 @@ bin/
 # secrets & machine state
 auth.json
 models-store.json
+trust.json
 
 # sessions & history
 sessions/
 
 # pi-subagents runtime state
 missions/
+run-history.jsonl
 
 # os noise
 .DS_Store
 
 # local backups
 *.bak
+*.bak-*
 
 # machine-local checkouts and backups
 mcp-servers/

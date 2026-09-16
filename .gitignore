@@ -10,6 +10,9 @@ models-store.json
 # sessions & history
 sessions/
 
+# pi-subagents runtime state
+missions/
+
 # os noise
 .DS_Store
 

@@ -1,10 +1,21 @@
 ---
 description: Full implementation workflow - scout gathers context, planner creates plan, worker implements
 ---
-Use the subagent tool with the chain parameter to execute this workflow:
+Run this as ONE `subagent` call using `workflowScript`. Thread each step's output
+into the next through the awaited run's `.output` — the legacy `chain` parameter
+is gone in pi-subagents.
 
-1. First, use the "scout" agent to find all code relevant to: $@
-2. Then, use the "planner" agent to create an implementation plan for "$@" using the context from the previous step (use {previous} placeholder)
-3. Finally, use the "worker" agent to implement the plan from the previous step (use {previous} placeholder)
+```js
+subagent({ workflowScript: `
+  const scouted = await runs.run("scout", { agent: "scout", task: "Find all code relevant to: $@" });
+  const planned = await runs.run("planner", { agent: "planner", task: "Create an implementation plan for \\"$@\\" using this context:\\n" + scouted.output });
+  return runs.run("implement", { agent: "worker", task: "Implement this plan:\\n" + planned.output });
+` });
+```
 
-Execute this as a chain, passing output between steps via {previous}.
+Steps:
+1. `scout` — find all code relevant to the request.
+2. `planner` — turn that context into an implementation plan.
+3. `worker` — implement the plan.
+
+Do not skip steps and do not do the work in this session.

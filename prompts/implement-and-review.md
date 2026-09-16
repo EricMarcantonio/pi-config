@@ -1,10 +1,21 @@
 ---
 description: Worker implements, reviewer reviews, worker applies feedback
 ---
-Use the subagent tool with the chain parameter to execute this workflow:
+Run this as ONE `subagent` call using `workflowScript`. Thread each step's output
+into the next through the awaited run's `.output` — the legacy `chain` parameter
+is gone in pi-subagents.
 
-1. First, use the "worker" agent to implement: $@
-2. Then, use the "reviewer" agent to review the implementation from the previous step (use {previous} placeholder)
-3. Finally, use the "worker" agent to apply the feedback from the review (use {previous} placeholder)
+```js
+subagent({ workflowScript: `
+  const implemented = await runs.run("implement", { agent: "worker", task: "$@" });
+  const reviewed = await runs.run("review", { agent: "reviewer", task: "Review the implementation from the previous step. Original task: $@\\n\\nImplementation:\\n" + implemented.output });
+  return runs.run("apply", { agent: "worker", task: "Apply the review feedback:\\n" + reviewed.output });
+` });
+```
 
-Execute this as a chain, passing output between steps via {previous}.
+Steps:
+1. `worker` — implement the request.
+2. `reviewer` — review the implementation.
+3. `worker` — apply the review feedback.
+
+Do not skip steps and do not do the work in this session.

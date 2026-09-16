@@ -2,7 +2,7 @@
  * Wordy footer
  *
  * Replaces pi's symbol footer (↑ ↓ R W CH) with plain words, e.g.:
- *   input 487k  output 56k  cache-read 4.2M  cache-hit 90.8%  cost $0.101  context 4.0%/1.0M (auto-compact)
+ *   input 487k  output 56k  cache-read 4.2M  cache-hit 90.8%  cost $0.101  context 4.0% (auto-compact)
  *
  * Why an extension: the built-in footer text is hardcoded in pi
  * (dist/modes/interactive/components/footer.js) and has no settings option,
@@ -144,11 +144,10 @@ function applyWordyFooter(ctx: ExtensionContext): void {
 
 				// ---- context usage
 				const usage = ctx.getContextUsage();
-				const contextWindow = usage?.contextWindow ?? ctx.model?.contextWindow ?? 0;
 				const percentValue = usage?.percent ?? 0;
-				const percent = usage && usage.percent !== null ? usage.percent.toFixed(1) : "?";
+				const percent = usage && usage.percent !== null ? `${usage.percent.toFixed(1)}%` : "?";
 				const auto = autoCompact ? " (auto-compact)" : "";
-				const contextText = `context ${percent}/${formatTokens(contextWindow)}${auto}`;
+				const contextText = `context ${percent}${auto}`;
 				const contextColored =
 					percentValue > 90
 						? theme.fg("error", contextText)

@@ -94,6 +94,15 @@ not by an Ollama package. See the Notes below.
   Tune with `/subagents-doctor`, `/subagents-guide`, `/subagents-fleet`, or JSON at
   `extensions/subagent/config.json` (present, holding `asyncByDefault`; note that
   `asyncByDefault` is a **config.json** key, not a `subagents.*` settings key).
+- **Offline archive**: the packages installed from `settings.json` `packages` are
+  mirrored to a private repo, `EricMarcantonio/pi-vendor-archive`
+  (cloned at `~/pi-vendor-archive`), so a package vanishing upstream cannot make this
+  config unrebuildable. A `pi-vendor` skill in
+  [EricMarcantonio/skills](https://github.com/EricMarcantonio/skills) reports drift and
+  refreshes it; the archive rebuilds itself
+  without the skill via `restore.sh`. That repo has independent history and is **never
+  merged into this one**. Not covered: the pi CLI
+  itself, `~/blender_mcp`, `mcp_homedepot`, and `uvx freecad-mcp`.
 - **Build workspaces**: a build's `spec.json`, price cache, `decisions.md` and
   `out/` live outside this repo in `~/Documents/woodbuild/<slug>/` (the convention
   `building-from-reference` owns). Not versioned.

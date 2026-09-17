@@ -99,7 +99,7 @@ not by an Ollama package. See the Notes below.
   (cloned at `~/pi-vendor-archive`), so a package vanishing upstream cannot make this
   config unrebuildable. A `pi-vendor` skill in
   [EricMarcantonio/skills](https://github.com/EricMarcantonio/skills) reports drift and
-  refreshes it (arrives with that package's `pi-vendor` PR); the archive rebuilds itself
+  refreshes it; the archive rebuilds itself
   without the skill via `restore.sh`. That repo has independent history and is **never
   merged into this one**. Not covered: the pi CLI
   itself, `~/blender_mcp`, `mcp_homedepot`, and `uvx freecad-mcp`.

@@ -6,20 +6,6 @@
       "baseUrl": "http://127.0.0.1:11434/v1",
       "models": [
         {
-          "_launch": true,
-          "contextWindow": 1048576,
-          "id": "deepseek-v4-flash:cloud",
-          "input": [
-            "text"
-          ],
-          "cost": {
-            "input": 0.22,
-            "output": 0.66,
-            "cacheRead": 0.007,
-            "cacheWrite": 0
-          }
-        },
-        {
           "id": "deepseek-v4.1-flash:cloud",
           "contextWindow": 1048576,
           "cost": {

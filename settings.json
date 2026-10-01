@@ -2,7 +2,7 @@
   "defaultModel": "deepseek-v4.1-flash:cloud",
   "defaultProvider": "ollama",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.85.1",
+  "lastChangelogVersion": "0.99.1",
   "theme": "dark",
   "wordyFooter": true,
   "subagents": {
@@ -10,18 +10,25 @@
     "modelScope": {
       "enforce": true,
       "strict": true,
-      "allow": ["ollama/deepseek-v4.1-flash:cloud"]
+      "allow": [
+        "ollama/deepseek-v4.1-flash:cloud"
+      ]
     },
     "agentOverrides": {
-      "scout": { "model": "deepseek-v4.1-flash:cloud" },
-      "worker": { "model": "deepseek-v4.1-flash:cloud" },
-      "reviewer": { "model": "deepseek-v4.1-flash:cloud" }
+      "scout": {
+        "model": "deepseek-v4.1-flash:cloud"
+      },
+      "worker": {
+        "model": "deepseek-v4.1-flash:cloud"
+      },
+      "reviewer": {
+        "model": "deepseek-v4.1-flash:cloud"
+      }
     }
   },
   "packages": [
     "npm:pi-caveman",
     "git:github.com/obra/superpowers",
-    "npm:pi-mcp-extension",
     "npm:@blazer2k/searxng-suite",
     "git:github.com/EricMarcantonio/skills",
     "npm:pi-subagents"

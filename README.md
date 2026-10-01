@@ -37,7 +37,6 @@ Then install the packages listed in `settings.json`:
 
 ```bash
 pi install npm:pi-caveman
-pi install npm:pi-mcp-extension
 pi install npm:@blazer2k/searxng-suite
 pi install git:github.com/obra/superpowers
 pi install git:github.com/EricMarcantonio/skills
@@ -111,7 +110,7 @@ not by an Ollama package. See the Notes below.
 - **Context windows** come from `ollama show <model>`.
 - **Web tools**: `@blazer2k/searxng-suite` provides `web_search` and `web_extract`, backed by a local SearXNG instance. `SEARXNG_URL` is set to `http://localhost:8080` in `~/.zshrc` (Docker setup lives in `~/searxng`). Ollama is used only for reasoning; the former `@ollama/pi-web-search` package is intentionally not used.
 - **Vision / image input**: pi only forwards image attachments to models whose `models.json` entry lists `"input": ["text", "image"]`. Without it the model silently receives text only. Verified by an image probe (prompt tokens 31 → 340 when an image is attached): image-capable are `deepseek-v4.1-flash:cloud` and `kimi-k3:cloud`; `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud` reject images with HTTP 400. Regenerating `models.json` can drop the `input` field, so re-add it if attachments stop reaching the model.
-- **MCP servers**: `mcp.json` configures MCP servers for `npm:pi-mcp-extension` (global scope, applies to all projects). Three stdio servers, all `lifecycle: lazy` (start on first use, not at session start): `freecad`, `homedepot`, `blender`. `freecad` (`uvx freecad-mcp`) bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp_freecad_*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp`.
+- **MCP servers**: `mcp.json` configures MCP servers for pi's built-in MCP support (global scope, applies to all projects; no extension package needed). Five stdio servers: `home-assistant`, `freecad`, `homedepot`, `blender`, `playwright`. Servers connect at session start; a slow server's tools appear once it connects. `freecad` (`uvx freecad-mcp`) bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp__freecad__*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp` or `pi mcp list`.
   `homedepot` is reached by the engine through the
   `plugins/homedepot/skills/homedepot-catalogue/scripts/homedepot_adapter.py` inside
   the installed package clone (`--adapter`); without it the engine prices from the
@@ -122,11 +121,12 @@ not by an Ollama package. See the Notes below.
   ```bash
   git clone https://projects.blender.org/lab/blender_mcp.git ~/blender_mcp
   ```
-- **MCP config path gotcha**: `pi-mcp-extension` hardcodes its global config path as `~/.pi/agent/mcp.json`; it does **not** honour `PI_CODING_AGENT_DIR`. Since this config dir is `~/pi-config`, that path is a symlink into this repo:
+- **MCP config path**: pi reads the global MCP config from `<config dir>/mcp.json`, i.e. `PI_CODING_AGENT_DIR/mcp.json`, falling back to `~/.pi/agent/mcp.json`. Since this setup symlinks both `~/.cache/pi-ts/mcp.json` and `~/.pi/agent/mcp.json` into this repo, edit `~/pi-config/mcp.json` and it is picked up either way:
   ```bash
   ln -sfn ~/pi-config/mcp.json ~/.pi/agent/mcp.json
+  ln -sfn ~/pi-config/mcp.json "$PI_CODING_AGENT_DIR/mcp.json"
   ```
-  Restore it on any machine using option B, or MCP servers silently do not load.
+  Restore them on any machine, or MCP servers silently do not load.
 - **FreeCAD MCP install** (two halves — MCP server + in-FreeCAD addon):
   ```bash
   brew install uv                       # provides uvx; freecad-mcp is fetched on demand

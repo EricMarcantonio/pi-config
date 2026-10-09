@@ -2,7 +2,7 @@
   "defaultModel": "deepseek-v4.1-flash:cloud",
   "defaultProvider": "ollama",
   "hideThinkingBlock": true,
-  "lastChangelogVersion": "0.99.1",
+  "lastChangelogVersion": "1.0.0",
   "theme": "dark",
   "wordyFooter": true,
   "subagents": {

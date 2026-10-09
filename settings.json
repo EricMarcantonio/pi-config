@@ -26,7 +26,15 @@
       "skills": [
         "skills/playwright-cli"
       ]
-    }
+    },
+    "git:github.com/obra/superpowers",
+    {
+      "source": "git:github.com/EricMarcantonio/skills",
+      "skills": [
+        "!plugins/clean-code/skills/clean-code"
+      ]
+    },
+    "npm:pi-graft@0.1.2"
   ],
   "webSearch": {
     "searxngUrl": "http://127.0.0.1:8888",

@@ -18,6 +18,7 @@ building skills) live on the `eric` branch, on top of this one.
 | `prompts/` | `/implement`, `/scout-and-plan` and `/implement-and-review` |
 | `extensions/todo.ts` | a todo list tool |
 | `extensions/wordy-footer.ts` | replaces the symbol footer with words |
+| `extensions/graft.ts` | [Graft](https://github.com/trailhq/graft) support for pi in repos that have a `graft/` graph |
 | `extensions/subagent/config.json` | runs subagents async by default |
 | `caveman.json` | settings for the terse-reply package |
 
@@ -72,6 +73,12 @@ Merge by hand instead if you already have your own `settings.json` or `mcp.json`
   `deepseek-v4.1-flash:cloud` and restricts subagents to that model (`modelScope` with
   `enforce` and `strict`). An out-of-scope model is rejected before launch, not swapped. Tune with
   `/subagents-doctor` or `extensions/subagent/config.json`.
+- **Graft**: Graft has no pi integration of its own yet. `graft init --agents claude agents`
+  writes the AGENTS.md section pi reads, plus the MCP config, skill and hooks for Claude Code.
+  `extensions/graft.ts` gives pi the rest: in a repo with a `graft/` graph it registers the `graft`
+  MCP server, loads the Graft skill, adds Graft's blast-radius note after each edit and starts
+  Graft's re-sync at the end of each run. It needs the `graft` CLI
+  (`npm install -g @nanonets/graft`) and does nothing without it.
 - **More skills**: to load other skills from the skills package, add their paths to the `skills`
   filter in `settings.json`. See that repo's README.
 - **Footer**: toggle the wordy footer with `/footer-words`; the choice is saved to

@@ -2,6 +2,7 @@
   "defaultModel": "deepseek-v4.1-flash:cloud",
   "defaultProvider": "ollama",
   "hideThinkingBlock": true,
+  "lastChangelogVersion": "1.0.0",
   "theme": "dark",
   "wordyFooter": true,
   "subagents": {
@@ -28,13 +29,9 @@
   "packages": [
     "npm:pi-caveman",
     "git:github.com/obra/superpowers",
+    "npm:@blazer2k/searxng-suite",
+    "git:github.com/EricMarcantonio/skills",
     "npm:pi-subagents",
-    "npm:pi-graft@0.1.2",
-    {
-      "source": "git:github.com/EricMarcantonio/skills",
-      "skills": [
-        "plugins/clean-code/skills/clean-code"
-      ]
-    }
+    "npm:pi-graft@0.1.2"
   ]
 }

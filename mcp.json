@@ -1,30 +1,18 @@
 {
   "mcpServers": {
-    "home-assistant": {
-      "command": "/Users/eric/.local/bin/ha-mcp-proxy"
-    },
-    "freecad": {
-      "command": "uvx",
-      "args": ["freecad-mcp"]
-    },
-    "homedepot": {
-      "command": "node",
-      "args": ["/Users/eric/.pi/agent/mcp-servers/mcp_homedepot/dist/index.js"],
-      "env": {
-        "HD_DEFAULT_STORE": "7011"
-      }
-    },
-    "blender": {
-      "command": "uv",
-      "args": ["--directory", "/Users/eric/blender_mcp/mcp", "run", "blender-mcp"]
-    },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "args": [
+        "-y",
+        "@playwright/mcp@latest"
+      ]
     },
     "excalidraw": {
       "command": "npx",
-      "args": ["-y", "mcp-excalidraw-server"]
+      "args": [
+        "-y",
+        "mcp-excalidraw-server"
+      ]
     }
   }
 }

@@ -14,6 +14,7 @@ sessions/
 # pi-subagents runtime state
 missions/
 run-history.jsonl
+pi-subagents/
 
 # os noise
 .DS_Store

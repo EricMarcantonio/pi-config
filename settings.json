@@ -29,6 +29,7 @@
     "npm:pi-caveman",
     "git:github.com/obra/superpowers",
     "npm:pi-subagents",
+    "npm:pi-graft@0.1.2",
     {
       "source": "git:github.com/EricMarcantonio/skills",
       "skills": [

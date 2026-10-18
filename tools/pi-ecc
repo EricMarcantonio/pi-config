@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# pi-ecc — start pi in a clean room where the only packages are pi-ecc and pi-subagents.
+#
+#   pi-ecc                 start a session (everything after the command goes to pi)
+#   pi-ecc --print "..."   same, non-interactive
+#   pi-ecc on | off        add / remove the ECC bundle in the room
+#   pi-ecc status          report whether the room has ECC
+#   pi-ecc where           print the room directory
+#   pi-ecc help
+#
+# The room is a separate pi config dir, so your real setup (superpowers, caveman,
+# graft, searxng, …) is untouched and never loads here. Credentials and model
+# definitions are symlinked from your main config dir: one source of truth, no
+# re-login.
+set -euo pipefail
+
+ECC_SOURCE="${PI_ECC_PACKAGE:-git:git@github.com:EricMarcantonio/pi-ecc}"
+DEPS=(npm:pi-subagents)
+ROOM="${PI_ECC_HOME:-$HOME/.pi-ecc-agent}"
+SRC_AGENT_DIR="${PI_ECC_SOURCE_AGENT_DIR:-${PI_CODING_AGENT_DIR:-$HOME/.pi/agent}}"
+PI_BIN="${PI_BIN:-pi}"
+LINKED=(auth.json models.json models-store.json)
+
+die() { printf 'pi-ecc: %s\n' "$*" >&2; exit 1; }
+
+usage() {
+  cat <<'USAGE'
+pi-ecc — pi in a clean room: pi-ecc + pi-subagents, nothing else.
+
+  pi-ecc [pi args…]     start pi with only the ECC bundle loaded
+  pi-ecc on             enable the ECC bundle in the room
+  pi-ecc off            disable it (room keeps pi-subagents)
+  pi-ecc status         report on/off
+  pi-ecc where          print the room and its settings path
+  pi-ecc update         update the packages inside the room
+  pi-ecc help           this text
+
+Environment:
+  PI_ECC_HOME               room directory        (default ~/.pi-ecc-agent)
+  PI_ECC_PACKAGE            ECC source            (default the private git repo)
+  PI_ECC_SOURCE_AGENT_DIR   where auth/models come from (default $PI_CODING_AGENT_DIR)
+
+Turning ECC off here never affects your normal `pi` sessions, and nothing in your
+normal config can flip it on. The room is a separate config dir.
+USAGE
+}
+
+json_edit() { # json_edit <file> <python-expression operating on `d`>
+  python3 - "$1" "$2" <<'PY'
+import json, sys
+path, expr = sys.argv[1], sys.argv[2]
+try:
+    with open(path) as fh:
+        d = json.load(fh)
+except FileNotFoundError:
+    d = {}
+except json.JSONDecodeError as exc:
+    sys.exit(f"pi-ecc: {path} is not valid JSON: {exc}")
+if not isinstance(d, dict):
+    sys.exit(f"pi-ecc: {path} must contain a JSON object")
+exec(expr)
+tmp = f"{path}.tmp"
+with open(tmp, "w") as fh:
+    json.dump(d, fh, indent=2)
+    fh.write("\n")
+import os
+os.replace(tmp, path)
+PY
+}
+
+provision() {
+  mkdir -p "$ROOM"
+  local settings="$ROOM/settings.json"
+  [ -f "$settings" ] || printf '{}\n' > "$settings"
+
+  for name in "${LINKED[@]}"; do
+    if [ -e "$ROOM/$name" ] || [ -L "$ROOM/$name" ]; then continue; fi
+    [ -e "$SRC_AGENT_DIR/$name" ] || continue
+    ln -s "$SRC_AGENT_DIR/$name" "$ROOM/$name"
+  done
+
+  [ -e "$ROOM/auth.json" ] || die "no credentials: expected $SRC_AGENT_DIR/auth.json — set PI_ECC_SOURCE_AGENT_DIR to the config dir that has your auth.json"
+
+  # Seed model defaults from the main config only when the room has none.
+  local src_settings="$SRC_AGENT_DIR/settings.json"
+  json_edit "$settings" "
+try:
+    src = json.load(open('$src_settings'))
+except Exception:
+    src = {}
+for key in ('defaultProvider', 'defaultModel', 'defaultThinkingLevel'):
+    if key not in d and key in src:
+        d[key] = src[key]
+packages = d.setdefault('packages', [])
+for dep in ('${DEPS[0]}',):
+    if dep not in packages:
+        packages.append(dep)
+"
+}
+
+ecc_index() { # prints 0 when the ECC source is present in the room's packages
+  python3 - "$ROOM/settings.json" "$ECC_SOURCE" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+for entry in d.get('packages', []):
+    source = entry if isinstance(entry, str) else (entry.get('source') if isinstance(entry, dict) else None)
+    if source == sys.argv[2]:
+        sys.exit(0)
+sys.exit(1)
+PY
+}
+
+enable() {
+  provision
+  json_edit "$ROOM/settings.json" "
+packages = [p for p in d.get('packages', []) if not (isinstance(p, str) and 'pi-ecc' in p)]
+packages.append('$ECC_SOURCE')
+d['packages'] = packages
+"
+  ensure_deps
+  printf 'pi-ecc: on — %s\n' "$ECC_SOURCE"
+}
+
+ensure_deps() {
+  json_edit "$ROOM/settings.json" "
+packages = d.setdefault('packages', [])
+for dep in ('${DEPS[0]}',):
+    if dep not in packages:
+        packages.append(dep)
+"
+}
+
+disable() {
+  provision
+  json_edit "$ROOM/settings.json" "
+d['packages'] = [p for p in d.get('packages', []) if not (isinstance(p, str) and 'pi-ecc' in p)]
+"
+  ensure_deps
+  printf 'pi-ecc: off — ECC bundle removed from %s (pi-subagents kept)\n' "$ROOM"
+}
+
+status() {
+  if [ -f "$ROOM/settings.json" ] && ecc_index; then
+    printf 'pi-ecc: on  (%s)\n' "$ROOM"
+  else
+    printf 'pi-ecc: off (%s)\n' "$ROOM"
+  fi
+}
+
+cmd="${1:-}"; shift || true
+case "$cmd" in
+  help|-h|--help) usage; exit 0 ;;
+  on)  enable; exit 0 ;;
+  off) disable; exit 0 ;;
+  status) status; exit 0 ;;
+  where) printf '%s\n' "$ROOM"; printf '%s\n' "$ROOM/settings.json"; exit 0 ;;
+  update) provision; PI_CODING_AGENT_DIR="$ROOM" "$PI_BIN" update --extensions; exit $? ;;
+esac
+
+if [ -n "$cmd" ]; then
+  set -- "$cmd" "$@"
+fi
+
+if [ -f "$ROOM/settings.json" ]; then
+  provision
+else
+  enable >/dev/null   # first run: a fresh room starts with ECC on
+fi
+ecc_index || die "ECC is off in this room — run 'pi-ecc on', or 'pi-ecc help'"
+export PI_CODING_AGENT_DIR="$ROOM"
+exec "$PI_BIN" "$@"

@@ -14,6 +14,25 @@
       "skills": [
         "plugins/clean-code/skills/clean-code"
       ]
+    },
+    {
+      "source": "git:github.com/marcantonio-dev/agent-browser@d52a5e90c372ec4710c69adc3837ac14bbd852aa",
+      "skills": [
+        "skills/agent-browser"
+      ]
+    },
+    {
+      "source": "git:github.com/marcantonio-dev/playwright-cli@0a808078d96496cf2a8fa725143c870354f63cda",
+      "skills": [
+        "skills/playwright-cli"
+      ]
     }
-  ]
+  ],
+  "webSearch": {
+    "searxngUrl": "http://127.0.0.1:8888",
+    "startCommand": "docker compose -f services/compose.yml up -d searxng"
+  },
+  "webFetch": {
+    "prompt": false
+  }
 }

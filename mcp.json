@@ -1,17 +1,20 @@
 {
   "mcpServers": {
-    "playwright": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@playwright/mcp@latest"
-      ]
-    },
     "excalidraw": {
-      "command": "npx",
+      "command": "docker",
       "args": [
-        "-y",
-        "mcp-excalidraw-server"
+        "run",
+        "-i",
+        "--rm",
+        "--pull",
+        "never",
+        "--network",
+        "pi-services",
+        "-e",
+        "EXPRESS_SERVER_URL=http://pi-excalidraw-canvas:3000",
+        "-e",
+        "ENABLE_CANVAS_SYNC=true",
+        "pi-excalidraw-mcp:local"
       ]
     }
   }

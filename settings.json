@@ -4,32 +4,10 @@
   "hideThinkingBlock": true,
   "theme": "dark",
   "wordyFooter": true,
-  "subagents": {
-    "defaultProvider": "ollama",
-    "modelScope": {
-      "enforce": true,
-      "strict": true,
-      "allow": [
-        "ollama/deepseek-v4.1-flash:cloud"
-      ]
-    },
-    "agentOverrides": {
-      "scout": {
-        "model": "deepseek-v4.1-flash:cloud"
-      },
-      "worker": {
-        "model": "deepseek-v4.1-flash:cloud"
-      },
-      "reviewer": {
-        "model": "deepseek-v4.1-flash:cloud"
-      }
-    }
-  },
   "packages": [
-    "npm:pi-caveman",
-    "git:github.com/obra/superpowers",
-    "npm:pi-subagents",
-    "npm:pi-graft@0.1.2",
+    "git:github.com/EricMarcantonio/pi-caveman@9e83d8a0d1195b4f3c50eb86144937234629b6ce",
+    "git:github.com/EricMarcantonio/pi-code",
+    "git:github.com/EricMarcantonio/ECC@c05b2d6614f62f6db0047669aa4eefb223d478f9",
     {
       "source": "git:github.com/EricMarcantonio/skills",
       "skills": [

@@ -16,7 +16,7 @@ one.
 | `mcp.json` | MCP servers: `playwright` (browser automation) and `excalidraw` (diagram canvas) |
 | `extensions/wordy-footer.ts` | replaces the symbol footer with words |
 | `caveman.json` | settings for the terse-reply package |
-| `renovate.json` | Renovate, using the shared preset from `marcantonio-dev/mirror-control` |
+| `.github/` | weekly mirror-pin bump workflow and Dependabot config |
 
 Packages installed from `settings.json`. Third-party packages come from mirrors in my `marcantonio-dev` org, pinned to a
 commit (see [Mirrors](#mirrors)):
@@ -86,9 +86,10 @@ commit SHA on each mirror's `vetted` branch.
 
 [`mirror-control`](https://github.com/marcantonio-dev/mirror-control) syncs every mirror from
 upstream each week. It never force-pushes, and it moves `vetted` only after a commit has waited a
-week. Renovate (`renovate.json`, using the preset from `mirror-control`) then opens a PR here
-bumping the pin. Nothing changes until that PR is merged. The same preset puts a 7-day wait on
-GitHub Action and registry updates.
+week. `.github/workflows/bump-mirror-pins.yml` then calls mirror-control's shared `bump-pins`
+workflow, which opens a `Bump mirror pins` PR here. It only fast-forwards pins and runs with this
+repo's own token, so no third-party app is involved. Nothing changes until that PR is merged.
+Dependabot keeps the pinned workflow reference current.
 
 To add a package: fork it into the org (see the `mirror-control` README), then add it to
 `settings.json` as `git:github.com/marcantonio-dev/<repo>@<full sha on vetted>`.

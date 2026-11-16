@@ -24,6 +24,9 @@ commit (see [Mirrors](#mirrors)):
 - [`pi-code`](https://github.com/EricMarcantonio/pi-code): the Claude Code experience. It reads
   your `.claude` config (rules, commands, skills, hooks, output styles, MCP, agents) and adds todo,
   checkpoints, memory, web search and subagents
+- [`pi-claude-code`](https://github.com/earendil-works/pi-claude-code), mirrored as
+  [`marcantonio-dev/pi-claude-code`](https://github.com/marcantonio-dev/pi-claude-code): a pi
+  provider that runs on your Claude Code subscription
 - [`ECC`](https://github.com/affaan-m/ECC), forked as
   [`marcantonio-dev/ECC`](https://github.com/marcantonio-dev/ECC) (Everything Claude Code): skills, commands, engineering
   rules and session hooks through its Pi adapter. Run `/ecc-doctor` to check it loaded

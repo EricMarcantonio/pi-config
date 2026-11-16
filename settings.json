@@ -5,9 +5,9 @@
   "theme": "dark",
   "wordyFooter": true,
   "packages": [
-    "npm:pi-caveman",
+    "git:github.com/EricMarcantonio/pi-caveman@9e83d8a0d1195b4f3c50eb86144937234629b6ce",
     "git:github.com/EricMarcantonio/pi-code",
-    "git:github.com/affaan-m/ECC",
+    "git:github.com/EricMarcantonio/ECC@c05b2d6614f62f6db0047669aa4eefb223d478f9",
     {
       "source": "git:github.com/EricMarcantonio/skills",
       "skills": [

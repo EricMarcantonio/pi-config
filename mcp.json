@@ -4,14 +4,14 @@
       "command": "npx",
       "args": [
         "-y",
-        "@playwright/mcp@latest"
+        "@playwright/mcp@0.0.84"
       ]
     },
     "excalidraw": {
       "command": "npx",
       "args": [
         "-y",
-        "mcp-excalidraw-server"
+        "mcp-excalidraw-server@2.1.2"
       ]
     }
   }

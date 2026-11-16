@@ -13,7 +13,7 @@ one.
 |---|---|
 | `settings.json` | default model and provider, theme, packages |
 | `models.json` | custom `ollama` provider: cloud models with `cost` (USD per 1M tokens) and `contextWindow` |
-| `mcp.json` | MCP servers: `playwright` (browser automation) and `excalidraw` (diagram canvas) |
+| `mcp.json` | MCP servers, pinned to exact versions: `playwright` (browser automation) and `excalidraw` (diagram canvas) |
 | `extensions/wordy-footer.ts` | replaces the symbol footer with words |
 | `caveman.json` | settings for the terse-reply package |
 | `.github/` | weekly mirror-pin bump workflow and Dependabot config |
@@ -35,6 +35,12 @@ commit (see [Mirrors](#mirrors)):
   `/caveman off`, or remove it from `packages`
 - [`EricMarcantonio/skills`](https://github.com/EricMarcantonio/skills), filtered to the
   `clean-code` skill only
+- [`agent-browser`](https://github.com/vercel-labs/agent-browser), mirrored as
+  [`marcantonio-dev/agent-browser`](https://github.com/marcantonio-dev/agent-browser), and
+  [`playwright-cli`](https://github.com/microsoft/playwright-cli), mirrored as
+  [`marcantonio-dev/playwright-cli`](https://github.com/marcantonio-dev/playwright-cli): only their
+  skills, which teach agents to drive a browser and look at frontend apps. The CLIs themselves
+  come from npm (see [Browser tools](#browser-tools))
 
 Not included, because pi regenerates them: `npm/`, `git/`, `bin/`, `auth.json`,
 `models-store.json`, `sessions/`.
@@ -51,7 +57,8 @@ git clone https://github.com/EricMarcantonio/pi-config ~/pi-config
 echo 'export PI_CODING_AGENT_DIR=~/pi-config' >> ~/.zshrc   # or ~/.bashrc
 ```
 
-Start pi. It installs the packages listed in `settings.json` on first start.
+Start pi. It installs the packages listed in `settings.json` on first start. Then install the
+[browser tools](#browser-tools).
 
 ### Option B: copy into your existing config
 
@@ -61,6 +68,21 @@ cp -r extensions ~/.pi/agent/
 ```
 
 Merge by hand instead if you already have your own `settings.json` or `mcp.json`.
+
+## Browser tools
+
+The `agent-browser` and `playwright-cli` skills call CLIs that come from npm, not from the mirrors.
+Mirroring the git repos doesn't protect a published npm package, so install exact versions that
+match the pinned skills and have been out for at least a week:
+
+```bash
+npm install -g agent-browser@0.41.2 @playwright/cli@0.1.23
+agent-browser install            # downloads Chrome for Testing
+```
+
+When a `Bump mirror pins` PR moves either skill, bump these versions to the matching release.
+agent-browser's install script downloads its native binary from the upstream GitHub release
+without a checksum check, which is a risk of using the tool at all.
 
 ## Notes
 

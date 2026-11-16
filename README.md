@@ -16,21 +16,22 @@ one.
 | `mcp.json` | MCP servers: `playwright` (browser automation) and `excalidraw` (diagram canvas) |
 | `extensions/wordy-footer.ts` | replaces the symbol footer with words |
 | `caveman.json` | settings for the terse-reply package |
-| `forks.json` | each pinned fork and the upstream it tracks |
-| `.github/` | weekly workflow that syncs the forks and proposes pin bumps |
-| `renovate.json` | Renovate PRs for the workflow's pinned GitHub Actions |
+| `.github/` | weekly mirror-pin bump workflow and Dependabot config |
 
-Packages installed from `settings.json`. Third-party packages come from my forks, pinned to a
-commit (see [Fork updates](#fork-updates)):
+Packages installed from `settings.json`. Third-party packages come from mirrors in my `marcantonio-dev` org, pinned to a
+commit (see [Mirrors](#mirrors)):
 
 - [`pi-code`](https://github.com/EricMarcantonio/pi-code): the Claude Code experience. It reads
   your `.claude` config (rules, commands, skills, hooks, output styles, MCP, agents) and adds todo,
   checkpoints, memory, web search and subagents
+- [`pi-claude-code`](https://github.com/earendil-works/pi-claude-code), mirrored as
+  [`marcantonio-dev/pi-claude-code`](https://github.com/marcantonio-dev/pi-claude-code): a pi
+  provider that runs on your Claude Code subscription
 - [`ECC`](https://github.com/affaan-m/ECC), forked as
-  [`EricMarcantonio/ECC`](https://github.com/EricMarcantonio/ECC) (Everything Claude Code): skills, commands, engineering
+  [`marcantonio-dev/ECC`](https://github.com/marcantonio-dev/ECC) (Everything Claude Code): skills, commands, engineering
   rules and session hooks through its Pi adapter. Run `/ecc-doctor` to check it loaded
 - [`pi-caveman`](https://github.com/jonjonrankin/pi-caveman), forked as
-  [`EricMarcantonio/pi-caveman`](https://github.com/EricMarcantonio/pi-caveman): terse replies. Turn it off with
+  [`marcantonio-dev/pi-caveman`](https://github.com/marcantonio-dev/pi-caveman): terse replies. Turn it off with
   `/caveman off`, or remove it from `packages`
 - [`EricMarcantonio/skills`](https://github.com/EricMarcantonio/skills), filtered to the
   `clean-code` skill only
@@ -77,37 +78,20 @@ Merge by hand instead if you already have your own `settings.json` or `mcp.json`
   `settings.json` as `wordyFooter`. Delete the extension to restore the default footer.
 - **No secrets** are stored here.
 
-## Fork updates
+## Mirrors
 
-Third-party packages are a supply-chain risk, so they are never loaded straight from upstream:
+Third-party packages are a supply-chain risk, so they never load straight from upstream. They come
+from forks in the [`marcantonio-dev`](https://github.com/marcantonio-dev) org, pinned to a full
+commit SHA on each mirror's `vetted` branch.
 
-- Each one is forked under `EricMarcantonio`, so a deleted upstream doesn't break the config. Actions
-  are turned off on the forks.
-- `settings.json` pins each fork to a full commit SHA, so a branch or tag that moves changes nothing.
-- Every Monday, `.github/workflows/update-forks.yml` fast-forwards each fork from its upstream. It
-  never force-pushes, so a pinned commit can't disappear from the fork. It stops if upstream
-  history was rewritten or if GitHub reports a different parent than `forks.json`.
-- The fork head a run sees is staged, and only the next run (a week later) proposes it in a
-  `Bump pinned forks` PR with a diff link per fork. The week is counted from when the job saw the
-  commit, not from commit dates, which an attacker can fake. Nothing changes until you merge.
+[`mirror-control`](https://github.com/marcantonio-dev/mirror-control) syncs every mirror from
+upstream each week. It never force-pushes, and it moves `vetted` only after a commit has waited a
+week. `.github/workflows/bump-mirror-pins.yml` then calls mirror-control's shared `bump-pins`
+workflow, which opens a `Bump mirror pins` PR here. It only fast-forwards pins and runs with this
+repo's own token, so no third-party app is involved. Nothing changes until that PR is merged.
+Dependabot keeps the pinned workflow reference current.
 
-To add a fork: fork the repo, turn off its Actions, add it to `forks.json`, and add it to
-`settings.json` as `git:github.com/EricMarcantonio/<repo>@<full sha>`.
+To add a package: fork it into the org (see the `mirror-control` README), then add it to
+`settings.json` as `git:github.com/marcantonio-dev/<repo>@<full sha on vetted>`.
 
-The workflow needs a fine-grained personal access token in the `FORK_SYNC_TOKEN` secret, with
-access to `pi-config` and every fork:
-
-| permission | why |
-|---|---|
-| Contents: read and write | sync the forks, push the bump branch |
-| Workflows: read and write | sync forks whose upstream changed `.github/workflows` |
-| Pull requests: read and write | open the bump PR |
-| Variables: read and write | store staged heads in the `STAGED_PINS` variable |
-
-My own repos (`pi-code`, `skills`) aren't pinned and load from their default branch.
-
-[Renovate](https://docs.renovatebot.com/) (`renovate.json`) covers the one thing the fork workflow
-doesn't: the GitHub Actions the workflow uses, which are pinned to SHAs. It opens a PR only after a
-release is 7 days old. It is limited to GitHub Actions because it can't sync forks, and it has no
-reliable publish date for a plain git commit. Install the [Renovate app](https://github.com/apps/renovate)
-on this repo to turn it on.
+My own repos (`pi-code`, `skills`) aren't mirrored or pinned and load from their default branch.

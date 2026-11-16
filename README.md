@@ -103,13 +103,14 @@ Mirroring the git repos doesn't protect a published npm package, so install exac
 match the pinned skills and have been out for at least a week:
 
 ```bash
-npm install -g agent-browser@0.41.2 @playwright/cli@0.1.23
+npm install -g --before="$(date -v-7d +%F)" agent-browser@0.41.2 @playwright/cli@0.1.23
 agent-browser install            # downloads Chrome for Testing
 ```
 
-When a `Bump mirror pins` PR moves either skill, bump these versions to the matching release.
-agent-browser's install script downloads its native binary from the upstream GitHub release
-without a checksum check, which is a risk of using the tool at all.
+`--before` makes npm choose every dependency as it was a week ago. When a `Bump mirror pins` PR
+moves either skill, bump these versions to the matching release. agent-browser's npm package
+ships its native binaries, so npm's integrity check covers them. Recent npm skips its postinstall
+(which would otherwise download the binary from GitHub) unless you allow it; it isn't needed.
 
 ## Notes
 

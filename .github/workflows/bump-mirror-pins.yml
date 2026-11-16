@@ -11,4 +11,6 @@ permissions:
 
 jobs:
   bump:
-    uses: marcantonio-dev/mirror-control/.github/workflows/bump-pins.yml@e628e4e7884defd4efca96e3343ee826b19691be # v1.0.0
+    uses: marcantonio-dev/mirror-control/.github/workflows/bump-pins.yml@ca924cce815fbf485504a1f3fd1c9f2ae9faadca # v1.1.0
+    with:
+      files: settings.json services/compose.yml

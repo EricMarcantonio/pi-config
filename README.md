@@ -13,7 +13,8 @@ one.
 |---|---|
 | `settings.json` | default model and provider, theme, packages |
 | `models.json` | custom `ollama` provider: cloud models with `cost` (USD per 1M tokens) and `contextWindow` |
-| `mcp.json` | MCP servers, pinned to exact versions: `playwright` (browser automation) and `excalidraw` (diagram canvas) |
+| `mcp.json` | MCP servers: `excalidraw` (diagram canvas), run from a Docker image built from its mirror |
+| `services/` | Docker Compose services shared by every pi session: SearXNG and the excalidraw canvas |
 | `extensions/wordy-footer.ts` | replaces the symbol footer with words |
 | `caveman.json` | settings for the terse-reply package |
 | `.github/` | weekly mirror-pin bump workflow and Dependabot config |
@@ -57,17 +58,43 @@ git clone https://github.com/EricMarcantonio/pi-config ~/pi-config
 echo 'export PI_CODING_AGENT_DIR=~/pi-config' >> ~/.zshrc   # or ~/.bashrc
 ```
 
-Start pi. It installs the packages listed in `settings.json` on first start. Then install the
-[browser tools](#browser-tools).
+Start pi. It installs the packages listed in `settings.json` on first start. Then set up the
+[services](#services) and the [browser tools](#browser-tools).
 
 ### Option B: copy into your existing config
 
 ```bash
 cp settings.json models.json mcp.json caveman.json ~/.pi/agent/
-cp -r extensions ~/.pi/agent/
+cp -r extensions services ~/.pi/agent/
 ```
 
 Merge by hand instead if you already have your own `settings.json` or `mcp.json`.
+
+## Services
+
+`services/compose.yml` runs local services in Docker under one project, `pi-services`. The
+container names are fixed, so every pi session shares the same containers. Everything listens on
+`127.0.0.1` only. You need Docker running.
+
+```bash
+cd ~/.pi/agent   # or wherever this repo lives
+docker compose -f services/compose.yml --profile build-only build   # excalidraw images, from the mirror
+docker compose -f services/compose.yml up -d searxng excalidraw-canvas
+```
+
+- **SearXNG** (`pi-searxng`, http://127.0.0.1:8888) backs `web_search`. DuckDuckGo blocks scrapers,
+  and a local SearXNG searches from this machine's own IP. `settings.json` points pi-code at it with
+  `webSearch.searxngUrl`. If it isn't running, pi-code runs `webSearch.startCommand` in the background
+  when a session loads or a search fails, so you rarely have to start it by hand. The image is pinned
+  by digest; `services/searxng/settings.yml` turns on the JSON API.
+- **Excalidraw canvas** (`pi-excalidraw-canvas`, http://127.0.0.1:3000) is the live canvas the
+  `excalidraw` MCP server draws on. Both images are built from
+  [`marcantonio-dev/mcp_excalidraw`](https://github.com/marcantonio-dev/mcp_excalidraw) at a pinned
+  commit with its lockfile (`npm ci`). `mcp.json` runs the MCP server with `docker run --pull never`,
+  so it only ever uses the local build. After a `Bump mirror pins` PR moves the commit, rebuild.
+
+No web tool spends model tokens: `webFetch.prompt` is off, so `web_fetch` returns pages as
+markdown, and search goes to SearXNG rather than a paid search API.
 
 ## Browser tools
 

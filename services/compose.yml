@@ -1,0 +1,67 @@
+# Local services shared by every pi session. One project name and fixed container names mean
+# any session's `docker compose up -d` reuses the same containers instead of starting new ones.
+#
+#   docker compose -f services/compose.yml up -d searxng
+#
+# Pulled images are pinned by digest to releases at least a week old. Built images come from
+# marcantonio-dev mirrors at a commit on their `vetted` branch.
+name: pi-services
+
+networks:
+  default:
+    name: pi-services
+
+services:
+  searxng:
+    # 2026.11.8-3a3dd15bf
+    image: docker.io/searxng/searxng@sha256:bed9946e14c009da4efdb477545eb48eb8d1d87af25e9738ff8b8584cb89a311
+    container_name: pi-searxng
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8888:8080" # this machine only
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    environment:
+      SEARXNG_BASE_URL: http://127.0.0.1:8888/
+      # Only reachable from this machine, so the secret just has to be set.
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-pi-local-searxng}
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  excalidraw-canvas:
+    # Live canvas the excalidraw MCP server draws on: http://127.0.0.1:3000
+    build:
+      context: https://github.com/marcantonio-dev/mcp_excalidraw.git#1df6f8eba395cb2eb0a998ffba3237182a878197
+      dockerfile: Dockerfile.canvas
+    image: pi-excalidraw-canvas:local
+    container_name: pi-excalidraw-canvas
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      HOST: 0.0.0.0
+      PORT: "3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  excalidraw-mcp:
+    # Built only; pi runs it per session over stdio (see mcp.json). Not started by `up`.
+    build:
+      context: https://github.com/marcantonio-dev/mcp_excalidraw.git#1df6f8eba395cb2eb0a998ffba3237182a878197
+      dockerfile: Dockerfile
+    image: pi-excalidraw-mcp:local
+    profiles: ["build-only"]

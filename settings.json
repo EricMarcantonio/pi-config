@@ -27,5 +27,12 @@
         "skills/playwright-cli"
       ]
     }
-  ]
+  ],
+  "webSearch": {
+    "searxngUrl": "http://127.0.0.1:8888",
+    "startCommand": "docker compose -f services/compose.yml up -d searxng"
+  },
+  "webFetch": {
+    "prompt": false
+  }
 }

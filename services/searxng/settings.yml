@@ -1,0 +1,12 @@
+# Minimal SearXNG config for pi's web_search: defaults plus the JSON API.
+use_default_settings: true
+
+server:
+  limiter: false # local only, nothing to rate-limit
+  image_proxy: false
+
+search:
+  safe_search: 0
+  formats:
+    - html
+    - json

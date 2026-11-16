@@ -18,6 +18,7 @@ one.
 | `caveman.json` | settings for the terse-reply package |
 | `forks.json` | each pinned fork and the upstream it tracks |
 | `.github/` | weekly workflow that syncs the forks and proposes pin bumps |
+| `renovate.json` | Renovate PRs for the workflow's pinned GitHub Actions |
 
 Packages installed from `settings.json`. Third-party packages come from my forks, pinned to a
 commit (see [Fork updates](#fork-updates)):
@@ -104,3 +105,9 @@ access to `pi-config` and every fork:
 | Variables: read and write | store staged heads in the `STAGED_PINS` variable |
 
 My own repos (`pi-code`, `skills`) aren't pinned and load from their default branch.
+
+[Renovate](https://docs.renovatebot.com/) (`renovate.json`) covers the one thing the fork workflow
+doesn't: the GitHub Actions the workflow uses, which are pinned to SHAs. It opens a PR only after a
+release is 7 days old. It is limited to GitHub Actions because it can't sync forks, and it has no
+reliable publish date for a plain git commit. Install the [Renovate app](https://github.com/apps/renovate)
+on this repo to turn it on.

@@ -20,6 +20,21 @@
           ]
         },
         {
+          "id": "deepseek-v4.1-flash:1017-cloud",
+          "name": "DeepSeek-V4.1-Flash (1017)",
+          "contextWindow": 1048576,
+          "cost": {
+            "input": 0.15,
+            "output": 0.6,
+            "cacheRead": 0.003,
+            "cacheWrite": 0
+          },
+          "input": [
+            "text",
+            "image"
+          ]
+        },
+        {
           "id": "deepseek-v4-pro:cloud",
           "contextWindow": 1048576,
           "cost": {
@@ -38,6 +53,30 @@
             "cacheRead": 0.05,
             "cacheWrite": 0
           }
+        },
+        {
+          "id": "glm-5.3:cloud",
+          "contextWindow": 1048576,
+          "cost": {
+            "input": 1.4,
+            "output": 4.4,
+            "cacheRead": 0.26,
+            "cacheWrite": 0
+          }
+        },
+        {
+          "id": "glm-5.3-flash:cloud",
+          "contextWindow": 1048576,
+          "cost": {
+            "input": 0.15,
+            "output": 0.5,
+            "cacheRead": 0.03,
+            "cacheWrite": 0
+          },
+          "input": [
+            "text",
+            "image"
+          ]
         },
         {
           "id": "gpt-oss:120b:cloud",
@@ -161,6 +200,47 @@
             "output": 3.6,
             "cacheRead": 0,
             "cacheWrite": 0
+          }
+        }
+      ]
+    },
+    "llamacpp-local": {
+      "name": "llama.cpp router (local)",
+      "baseUrl": "http://127.0.0.1:8080/v1",
+      "api": "openai-completions",
+      "apiKey": "local",
+      "models": [
+        {
+          "id": "Qwen3.8-27B-Heretic",
+          "name": "Qwen3.8-27B Heretic Q6_K (MTP)",
+          "contextWindow": 32768,
+          "maxTokens": 16384,
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "low": "low",
+            "medium": "medium",
+            "high": "xhigh",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          },
+          "input": [
+            "text",
+            "image"
+          ],
+          "cost": {
+            "input": 0,
+            "output": 0,
+            "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "compat": {
+            "supportsStore": false,
+            "supportsDeveloperRole": false,
+            "supportsReasoningEffort": true,
+            "supportsUsageInStreaming": true,
+            "maxTokensField": "max_tokens"
           }
         }
       ]

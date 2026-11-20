@@ -43,6 +43,30 @@
         "ENABLE_CANVAS_SYNC=true",
         "pi-excalidraw-mcp:local"
       ]
+    },
+    "wordcraft": {
+      "command": "/Users/eric/.local/bin/wordcraft-cli",
+      "args": [
+        "mcp"
+      ]
+    },
+    "figcraft": {
+      "command": "/Users/eric/.local/bin/figcraft-cli",
+      "args": [
+        "mcp"
+      ]
+    },
+    "rea": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "rea-agents@6.7.0",
+        "mcp"
+      ],
+      "env": {
+        "HOPPER_LAUNCHER_PATH": "/Users/eric/Applications/Hopper Disassembler.app/Contents/MacOS/hopper"
+      }
     }
   }
 }

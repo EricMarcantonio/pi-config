@@ -25,3 +25,18 @@ models.json.pre-*
 
 # worktrees
 .worktrees/
+
+# subagent-driven-development scratch
+.superpowers/
+
+# personal working docs: design notes, plans and rulings stay on disk, not in the
+# shared config
+docs/superpowers/
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
+
+# pi runtime state
+run-history.jsonl
+missions/
+ecc/

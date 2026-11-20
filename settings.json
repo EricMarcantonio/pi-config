@@ -1,5 +1,5 @@
 {
-  "defaultModel": "deepseek-v4.1-flash:cloud",
+  "defaultModel": "deepseek-v4.1-flash:1017-cloud",
   "defaultProvider": "ollama",
   "hideThinkingBlock": true,
   "theme": "dark",
@@ -34,7 +34,8 @@
         "!plugins/clean-code/skills/clean-code"
       ]
     },
-    "npm:pi-graft@0.1.2"
+    "npm:pi-graft@0.1.2",
+    "git:git@github.com:EricMarcantonio/pi-ecc"
   ],
   "webSearch": {
     "searxngUrl": "http://127.0.0.1:8888",

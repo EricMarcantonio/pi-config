@@ -9,12 +9,18 @@ git switch main && git pull && git switch eric && git rebase main
 
 What this branch adds:
 
-- MCP servers `home-assistant`, `freecad`, `homedepot` and `blender` in `mcp.json`. They point at
-  paths on my Mac.
+- MCP servers `home-assistant`, `freecad`, `homedepot`, `blender`, `wordcraft`, `figcraft` and
+  `rea` in `mcp.json`. They point at paths on my Mac.
 - The full `EricMarcantonio/skills` package (woodbuild, freecad, homedepot and the rest), not
   filtered to clean-code.
-- `@blazer2k/searxng-suite` and `pi-searxng-suite.json`, backed by my SearXNG via `SEARXNG_URL`.
+- `obra/superpowers`, `pi-graft` and my `pi-ecc` package, plus the `tools/pi-ecc` launcher.
+- Extra Ollama models (`deepseek-v4.1-flash:1017-cloud` as default, `glm-5.3`) and a local
+  llama.cpp provider in `models.json`.
 - `extensions/herdr-agent-state.ts`, installed and managed by herdr.
+
+Web search, subagents and the Claude Code provider come from `main` (pi-code, SearXNG in
+`services/`, pi-claude-code), so this branch no longer carries `searxng-suite`, `pi-subagents`
+or `pi-claude-bridge`.
 
 The notes below are the original setup notes for those extras.
 
@@ -48,23 +54,7 @@ The notes below are the original setup notes for those extras.
   Because the entry is shared in `settings.json`, a colleague who clones this config
   gets the author's public plugin package cloned and loaded by pi on first start;
   `PI_OFFLINE=1` skips it.
-- **Subagents**: [pi-subagents](https://github.com/nicobailon/pi-subagents) provides the
-  `subagent` tool and the builtin agents `scout`, `researcher`, `evidence-auditor`,
-  `worker`, `reviewer`, `oracle`, `delegate`. This config used to carry a local
-  `extensions/subagent/` implementation with its own `chain` API; that is gone —
-  pi-subagents removed legacy `chain`/`tasks`/`parallel` in favour of `workflowScript`
-  (`runs.run` / `runs.all`), so the three `prompts/*.md` templates were rewritten.
-  Only `agents/planner.md` remains local (no builtin equivalent); `scout`/`worker`/
-  `reviewer` model pins now live in `settings.json` under `subagents.agentOverrides`
-  so the upstream builtin prompts win. `subagents.modelScope` restricts subagents to
-  `ollama/deepseek-v4.1-flash:cloud` alone (`enforce: true`, `strict: true`), so an
-  out-of-scope model — including an inherited session model — is rejected before
-  launch rather than silently used. Model scope is policy, not selection: it rejects,
-  it does not pick a cheaper model. Superpowers ships no agent definitions of its
-  own — its `Subagent (general-purpose):` templates map onto the `delegate` builtin.
-  Tune with `/subagents-doctor`, `/subagents-guide`, `/subagents-fleet`, or JSON at
-  `extensions/subagent/config.json` (present, holding `asyncByDefault`; note that
-  `asyncByDefault` is a **config.json** key, not a `subagents.*` settings key).
+
 - **Offline archive**: the packages installed from `settings.json` `packages` are
   mirrored to a private repo, `EricMarcantonio/pi-vendor-archive`
   (cloned at `~/pi-vendor-archive`), so a package vanishing upstream cannot make this
@@ -80,9 +70,8 @@ The notes below are the original setup notes for those extras.
 - **Ollama models**: `models.json` points at `http://127.0.0.1:11434/v1` with `apiKey: "ollama"`. Change `baseUrl` if your Ollama isn't local. All model ids use the `:cloud` suffix.
 - **Costs** are USD per 1M tokens, off-peak rates only (pi has no time-of-day pricing; Ollama peak, Mon–Fri 12–18 UTC, is ~2×).
 - **Context windows** come from `ollama show <model>`.
-- **Web tools**: `@blazer2k/searxng-suite` provides `web_search` and `web_extract`, backed by a local SearXNG instance. `SEARXNG_URL` is set to `http://localhost:8080` in `~/.zshrc` (Docker setup lives in `~/searxng`). Ollama is used only for reasoning; the former `@ollama/pi-web-search` package is intentionally not used.
 - **Vision / image input**: pi only forwards image attachments to models whose `models.json` entry lists `"input": ["text", "image"]`. Without it the model silently receives text only. Verified by an image probe (prompt tokens 31 → 340 when an image is attached): image-capable are `deepseek-v4.1-flash:cloud` and `kimi-k3:cloud`; `deepseek-v4-flash:cloud` and `deepseek-v4-pro:cloud` reject images with HTTP 400. Regenerating `models.json` can drop the `input` field, so re-add it if attachments stop reaching the model.
-- **MCP servers**: `mcp.json` configures MCP servers for pi's built-in MCP support (global scope, applies to all projects; no extension package needed). Five stdio servers: `home-assistant`, `freecad`, `homedepot`, `blender`, `playwright`. Servers connect at session start; a slow server's tools appear once it connects. `freecad` (`uvx freecad-mcp`) bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp__freecad__*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp` or `pi mcp list`.
+- **MCP servers**: `mcp.json` configures MCP servers for pi's built-in MCP support (global scope, applies to all projects; no extension package needed). Stdio servers: `home-assistant`, `freecad`, `homedepot`, `blender`, `wordcraft`, `figcraft`, `rea`, plus `excalidraw` from `main`. Servers connect at session start; a slow server's tools appear once it connects. `freecad` (`uvx freecad-mcp`) bridges to a running FreeCAD instance over its RPC socket (default port 9875); tools register as `mcp__freecad__*` (17: `create_document`, `create_object`, `edit_object`, `delete_object`, `execute_code`, `execute_code_async`, `execute_code_headless`, `get_async_status`, `get_view`, `insert_part_from_library`, `get_objects`, `get_object`, `get_parts_list`, `reload_document`, `list_documents`, `get_rpc_status`, `run_fem_analysis`); inspect with `/mcp` or `pi mcp list`.
   `homedepot` is reached by the engine through the
   `plugins/homedepot/skills/homedepot-catalogue/scripts/homedepot_adapter.py` inside
   the installed package clone (`--adapter`); without it the engine prices from the

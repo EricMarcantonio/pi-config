@@ -9,12 +9,7 @@
     "git:github.com/EricMarcantonio/pi-code",
     "git:github.com/marcantonio-dev/pi-claude-code@d5b5e04c314d3452d357174d16d10dda34daa2d2",
     "git:github.com/marcantonio-dev/ECC@c05b2d6614f62f6db0047669aa4eefb223d478f9",
-    {
-      "source": "git:github.com/EricMarcantonio/skills",
-      "skills": [
-        "plugins/clean-code/skills/clean-code"
-      ]
-    },
+    "git:github.com/EricMarcantonio/skills",
     {
       "source": "git:github.com/marcantonio-dev/agent-browser@d52a5e90c372ec4710c69adc3837ac14bbd852aa",
       "skills": [
@@ -28,12 +23,6 @@
       ]
     },
     "git:github.com/obra/superpowers",
-    {
-      "source": "git:github.com/EricMarcantonio/skills",
-      "skills": [
-        "!plugins/clean-code/skills/clean-code"
-      ]
-    },
     "npm:pi-graft@0.1.2",
     "git:git@github.com:EricMarcantonio/pi-ecc"
   ],

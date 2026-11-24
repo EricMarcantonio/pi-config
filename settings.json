@@ -5,10 +5,10 @@
   "theme": "dark",
   "wordyFooter": true,
   "packages": [
-    "git:github.com/marcantonio-dev/pi-caveman@9e83d8a0d1195b4f3c50eb86144937234629b6ce",
+    "git:github.com/marcantonio-dev/pi-caveman@81411293756f68d92dd816d3bdea7e97f2ede955",
     "git:github.com/EricMarcantonio/pi-code",
     "git:github.com/marcantonio-dev/pi-claude-code@d5b5e04c314d3452d357174d16d10dda34daa2d2",
-    "git:github.com/marcantonio-dev/ECC@c05b2d6614f62f6db0047669aa4eefb223d478f9",
+    "git:github.com/marcantonio-dev/ECC@d2ef2680594f9a17526a6e1a2e18b3d242c5d17b",
     {
       "source": "git:github.com/EricMarcantonio/skills",
       "skills": [
@@ -16,13 +16,13 @@
       ]
     },
     {
-      "source": "git:github.com/marcantonio-dev/agent-browser@d52a5e90c372ec4710c69adc3837ac14bbd852aa",
+      "source": "git:github.com/marcantonio-dev/agent-browser@b06e2533ba9b3823b8a96c859d455cb55f4d7893",
       "skills": [
         "skills/agent-browser"
       ]
     },
     {
-      "source": "git:github.com/marcantonio-dev/playwright-cli@0a808078d96496cf2a8fa725143c870354f63cda",
+      "source": "git:github.com/marcantonio-dev/playwright-cli@b21724888b8100b05ef8dee3a92f2bb03bf4dcde",
       "skills": [
         "skills/playwright-cli"
       ]

@@ -41,7 +41,7 @@ services:
   excalidraw-canvas:
     # Live canvas the excalidraw MCP server draws on: http://127.0.0.1:3000
     build:
-      context: https://github.com/marcantonio-dev/mcp_excalidraw.git#1df6f8eba395cb2eb0a998ffba3237182a878197
+      context: https://github.com/marcantonio-dev/mcp_excalidraw.git#81720ac819d2325177cd6137c6ad41d52d0f5374
       dockerfile: Dockerfile.canvas
     image: pi-excalidraw-canvas:local
     container_name: pi-excalidraw-canvas
@@ -61,7 +61,7 @@ services:
   excalidraw-mcp:
     # Built only; pi runs it per session over stdio (see mcp.json). Not started by `up`.
     build:
-      context: https://github.com/marcantonio-dev/mcp_excalidraw.git#1df6f8eba395cb2eb0a998ffba3237182a878197
+      context: https://github.com/marcantonio-dev/mcp_excalidraw.git#81720ac819d2325177cd6137c6ad41d52d0f5374
       dockerfile: Dockerfile
     image: pi-excalidraw-mcp:local
     profiles: ["build-only"]
